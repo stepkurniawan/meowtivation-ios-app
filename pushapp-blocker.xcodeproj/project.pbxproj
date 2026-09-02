@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		97FA23ED304817DD00A48C8F /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 97FA23EC304817DD00A48C8F /* README.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		97FA23D03046F68800A48C8F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		97FA23C03046F68600A48C8F /* pushapp-blocker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "pushapp-blocker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		97FA23CF3046F68800A48C8F /* pushapp-blockerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "pushapp-blockerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		97FA23D93046F68800A48C8F /* pushapp-blockerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "pushapp-blockerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		97FA23EC304817DD00A48C8F /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -75,6 +80,7 @@
 		97FA23B73046F68600A48C8F = {
 			isa = PBXGroup;
 			children = (
+				97FA23EC304817DD00A48C8F /* README.md */,
 				97FA23C23046F68600A48C8F /* pushapp-blocker */,
 				97FA23D23046F68800A48C8F /* pushapp-blockerTests */,
 				97FA23DC3046F68800A48C8F /* pushapp-blockerUITests */,
@@ -212,6 +218,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				97FA23ED304817DD00A48C8F /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
