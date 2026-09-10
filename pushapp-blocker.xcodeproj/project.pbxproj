@@ -181,6 +181,11 @@
 				TargetAttributes = {
 					97FA23BF3046F68600A48C8F = {
 						CreatedOnToolsVersion = 26.6;
+						SystemCapabilities = {
+							com.apple.FamilyControls = {
+								enabled = 1;
+							};
+						};
 					};
 					97FA23CE3046F68800A48C8F = {
 						CreatedOnToolsVersion = 26.6;
@@ -400,6 +405,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "pushapp-blocker/pushapp-blocker.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K9FT2YTWMF;
@@ -433,6 +439,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "pushapp-blocker/pushapp-blocker.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K9FT2YTWMF;

@@ -13,34 +13,47 @@ struct ContentView: View {
     @State private var isShowingCameraUnavailable = false
 
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        NavigationStack {
+            VStack(spacing: 24) {
+                Spacer()
 
-            Text("PushApp Blocker")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                Text("PushApp Blocker")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
 
-            Button {
-                openCamera()
-            } label: {
-                Label("Open Camera", systemImage: "camera.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+                Button {
+                    openCamera()
+                } label: {
+                    Label("Open Camera", systemImage: "camera.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.horizontal, 40)
+
+                NavigationLink {
+                    BlockedAppsView()
+                } label: {
+                    Label("Blocked Apps", systemImage: "lock.app.dashed")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .padding(.horizontal, 40)
+
+                Spacer()
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.horizontal, 40)
-
-            Spacer()
-        }
-        .sheet(isPresented: $isCameraOpen) {
-            CameraView()
-                .ignoresSafeArea()
-        }
-        .alert("Camera Unavailable", isPresented: $isShowingCameraUnavailable) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("This device does not have an available camera.")
+            .sheet(isPresented: $isCameraOpen) {
+                CameraView()
+                    .ignoresSafeArea()
+            }
+            .alert("Camera Unavailable", isPresented: $isShowingCameraUnavailable) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("This device does not have an available camera.")
+            }
         }
     }
 
