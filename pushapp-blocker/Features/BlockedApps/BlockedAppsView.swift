@@ -2,7 +2,7 @@ import FamilyControls
 import SwiftUI
 
 struct BlockedAppsView: View {
-    @StateObject private var store = BlockedAppsStore()
+    @EnvironmentObject private var store: BlockedAppsStore
     @State private var isPickerPresented = false
     @State private var authorizationError: String?
 
@@ -14,6 +14,13 @@ struct BlockedAppsView: View {
 
     var body: some View {
         List {
+            Section {
+                Label(
+                    store.isLocked ? "Workout needed to unlock" : "Unlocked for today",
+                    systemImage: store.isLocked ? "lock.fill" : "lock.open.fill"
+                )
+            }
+
             if !hasSelection {
                 ContentUnavailableView(
                     "No Apps Blocked",
@@ -95,5 +102,6 @@ struct BlockedAppsView: View {
 #Preview {
     NavigationStack {
         BlockedAppsView()
+            .environmentObject(BlockedAppsStore())
     }
 }

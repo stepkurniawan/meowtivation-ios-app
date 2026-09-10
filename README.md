@@ -3,6 +3,22 @@ App that blocks your distraction apps until you do your daily push up rep. It wi
 
 The app is in swift language using SwiftUI and SwiftData when possible. 
 
+## Daily lock state
+
+The app shares one `BlockedAppsStore` through the SwiftUI environment. Its
+read-only `isLocked` state controls shields for the selected apps, categories,
+and websites. The future workout completion flow should call
+`completeDailyWorkout()` on that shared store after a successful workout.
+This removes the shields without clearing the selection and saves the completion
+date in UserDefaults so the unlock survives app restarts.
+
+An unlock lasts for the current calendar day in the device's local time zone.
+The state refreshes on launch, foreground activation, and significant time changes
+(including midnight). The camera currently does not verify or complete workouts.
+Reapplying shields at midnight while the app is suspended or closed still requires
+a Device Activity monitoring extension; until then, shields reset when the app
+next becomes active.
+
 ## Run the app
 
 ### Prerequisites

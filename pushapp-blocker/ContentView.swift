@@ -105,4 +105,5 @@ struct CameraView: UIViewControllerRepresentable {
 
 #Preview {
     ContentView()
+        .environmentObject(BlockedAppsStore())
 }
