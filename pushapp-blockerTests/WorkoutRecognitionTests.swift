@@ -66,9 +66,7 @@ struct WorkoutRecognitionTests {
         let events = WorkoutFixtures.sequence().flatMap { engine.consume($0).reps }
 
         #expect(events.count == 3)
-        #expect(events.allSatisfy { $0.exercise == .pushUp })
         #expect(Set(events.map(\.id)).count == events.count)
-        #expect(engine.currentExercise == .pushUp)
     }
 
     @Test(arguments: [1.4, 4.5, 6.0])
@@ -175,7 +173,7 @@ struct WorkoutRecognitionTests {
 
     @Test func croppedBodyWorksWithOnlyTheArmChain() {
         let frame = WorkoutFixtures.frame(contraction: 0, time: 1)
-        #expect(PoseFeatures.samples(from: frame)[.pushUp] != nil)
+        #expect(PoseFeatures.pushUpSample(from: frame) != nil)
         #expect(frame.joints[.leftHip] == nil)
         #expect(frame.joints[.leftKnee] == nil)
         #expect(frame.joints[.leftAnkle] == nil)
@@ -183,12 +181,12 @@ struct WorkoutRecognitionTests {
 
     @Test func prefersRightArmAndFallsBackToLeftArm() {
         var frame = WorkoutFixtures.frame(contraction: 0, time: 1)
-        #expect(PoseFeatures.samples(from: frame)[.pushUp]?.side == 0)
+        #expect(PoseFeatures.pushUpSample(from: frame)?.side == 0)
 
         frame.joints[.rightShoulder] = nil
         frame.joints[.rightElbow] = nil
         frame.joints[.rightWrist] = nil
-        #expect(PoseFeatures.samples(from: frame)[.pushUp]?.side == 1)
+        #expect(PoseFeatures.pushUpSample(from: frame)?.side == 1)
     }
 
     @Test func brieflyMissingPreferredArmDoesNotSwitchSides() {
@@ -208,7 +206,7 @@ struct WorkoutRecognitionTests {
             let rightJoint = BodyJoint(rawValue: joint.rawValue.replacingOccurrences(of: "left", with: "right"))!
             frame.joints[joint] = nil
             frame.joints[rightJoint] = nil
-            #expect(PoseFeatures.samples(from: frame)[.pushUp] == nil)
+            #expect(PoseFeatures.pushUpSample(from: frame) == nil)
         }
     }
 
@@ -240,7 +238,7 @@ struct WorkoutRecognitionTests {
     @Test func duplicateFramesAndInvalidTimestampsDoNotCount() {
         var engine = WorkoutRecognitionEngine()
         let frames = WorkoutFixtures.sequence(reps: 1)
-        var events: [RepEvent] = []
+        var events: [PushUpRepEvent] = []
         for frame in frames {
             events += engine.consume(frame).reps
             #expect(engine.consume(frame).reps.isEmpty)
@@ -305,14 +303,13 @@ nonisolated private final class TestWorkoutCamera: WorkoutCameraControlling {
         for frame in WorkoutFixtures.sequence() {
             model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
         }
-        #expect(model.totals[.pushUp] == 3)
+        #expect(model.pushUpCount == 3)
 
         model.receive(.state(.interrupted), generation: camera.generation)
-        #expect(model.currentExercise == nil)
-        let totals = model.totals
+        let pushUpCount = model.pushUpCount
         model.receive(.frame(WorkoutFixtures.frame(contraction: 0, time: 40), milliseconds: 20),
                       generation: camera.generation)
-        #expect(model.totals == totals)
+        #expect(model.pushUpCount == pushUpCount)
 
         model.end()
         #expect(model.hasEnded)

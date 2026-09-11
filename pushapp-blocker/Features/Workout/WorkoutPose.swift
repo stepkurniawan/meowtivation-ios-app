@@ -1,15 +1,9 @@
-import Foundation 
+import Foundation
 import simd
 
-nonisolated enum ExerciseKind: String, CaseIterable, Codable, Sendable, Identifiable {
-    case pushUp
-    var id: String { rawValue }
-    var title: String {
-        "Push-up"
-    }
-    var placement: String {
-        "Use a side view with one shoulder, elbow, and wrist visible. Your legs can be out of frame."
-    }
+nonisolated enum PushUp {
+    static let title = "Push-up"
+    static let placement = "Use a side view with one shoulder, elbow, and wrist visible. Your legs can be out of frame."
 }
 
 nonisolated enum BodyJoint: String, CaseIterable, Codable, Sendable {
@@ -63,7 +57,7 @@ nonisolated enum RecognitionParameters {
     static let sideSwitchGracePeriod = 0.30
 }
 
-nonisolated struct ExerciseSample: Sendable {
+nonisolated struct PushUpSample: Sendable {
     var angle: Float
     var side: Int
 }
@@ -77,18 +71,15 @@ nonisolated enum PoseFeatures {
         return acos(max(-1, min(1, simd_dot(u, v) / divisor))) * 180 / .pi
     }
 
-    /// Returns the push-up sample when one shoulder-elbow-wrist chain is usable.
-    /// - Parameter frame: The pose frame to analyze.
-    /// - Returns: A push-up sample keyed by the detected exercise, if available.
-    static func samples(from frame: PoseFrame) -> [ExerciseKind: ExerciseSample] {
-        guard let sample = pushUpSamples(from: frame).first else { return [:] }
-        return [.pushUp: sample]
+    /// Returns a push-up sample when one shoulder-elbow-wrist chain is usable.
+    static func pushUpSample(from frame: PoseFrame) -> PushUpSample? {
+        pushUpSamples(from: frame).first
     }
 
     /// Returns all usable arm chains, ordered by the preferred side.
     /// The recognition engine applies temporal side selection so a brief
     /// confidence change cannot switch arms immediately.
-    static func pushUpSamples(from frame: PoseFrame) -> [ExerciseSample] {
+    static func pushUpSamples(from frame: PoseFrame) -> [PushUpSample] {
         guard !frame.cameraIsMoving else { return [] }
         return BodyJoint.sides.enumerated().compactMap { sideIndex, side in
             pushUpSample(shoulder: usable(side[0], in: frame),
@@ -104,7 +95,7 @@ nonisolated enum PoseFeatures {
     }
 
     private static func pushUpSample(shoulder: PoseJoint?, elbow: PoseJoint?, wrist: PoseJoint?,
-                                     side: Int) -> ExerciseSample? {
+                                     side: Int) -> PushUpSample? {
         guard let shoulder, let elbow, let wrist else { return nil }
         guard (0.04...0.8).contains(simd_distance(shoulder.position, elbow.position)),
               (0.04...0.8).contains(simd_distance(elbow.position, wrist.position)) else {
@@ -112,7 +103,7 @@ nonisolated enum PoseFeatures {
         }
         let elbowAngle = angle(shoulder.position, elbow.position, wrist.position)
         guard elbowAngle.isFinite else { return nil }
-        return ExerciseSample(angle: elbowAngle, side: side)
+        return PushUpSample(angle: elbowAngle, side: side)
     }
 }
 
@@ -167,7 +158,7 @@ nonisolated private struct OneEuroFilter2D {
 
 /// Stabilizes the display while making held joints unusable to recognition.
 /// A brief Vision dropout should not make the overlay disappear, but stale
-/// coordinates must never be treated as fresh exercise measurements.
+/// coordinates must never be treated as fresh push-up measurements.
 nonisolated struct PoseStabilizer {
     private struct Track {
         var filter = OneEuroFilter2D()

@@ -9,10 +9,10 @@ nonisolated enum WorkoutCameraState: Equatable, Sendable {
     var message: String {
         switch self {
         case .idle: "Camera paused"
-        case .requestingPermission: "Allow camera access to count your workout."
+        case .requestingPermission: "Allow camera access to count push-ups."
         case .running: ""
-        case .denied: "Allow Camera access in Settings to start your workout."
-        case .unavailable: "A front camera is unavailable. Use a physical iPhone to track workouts."
+        case .denied: "Allow Camera access in Settings to start counting push-ups."
+        case .unavailable: "A front camera is unavailable. Use a physical iPhone to track push-ups."
         case .interrupted: "Camera interrupted. Tracking will resume when the camera is available."
         case .failed(let message): message
         }
@@ -234,7 +234,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             failures += 1
             emit(.frame(PoseFrame(timestamp: now, joints: [:]), milliseconds: 0))
             if failures >= 3 {
-                emit(.state(.failed("Body tracking is unavailable. Try again with the exercise joints visible.")))
+                emit(.state(.failed("Body tracking is unavailable. Try again with the push-up joints visible.")))
                 active = false
                 motion.stopDeviceMotionUpdates()
                 session.stopRunning()

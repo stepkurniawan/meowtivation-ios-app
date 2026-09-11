@@ -43,13 +43,12 @@ final class WorkoutSpeech: NSObject, WorkoutSpeaking, AVSpeechSynthesizerDelegat
 
 @MainActor
 final class WorkoutSessionModel: ObservableObject {
-    @Published private(set) var totals: [ExerciseKind: Int] = [:]
-    @Published private(set) var currentExercise: ExerciseKind?
+    @Published private(set) var pushUpCount = 0
     @Published private(set) var poseReady = false
     @Published private(set) var tracking = WorkoutTracking.searching
     @Published private(set) var cameraState = WorkoutCameraState.idle
     @Published private(set) var latestFrame: PoseFrame?
-    @Published private(set) var angles: [ExerciseKind: Float] = [:]
+    @Published private(set) var pushUpAngle: Float?
     @Published private(set) var processingMilliseconds = 0.0
     @Published private(set) var analysisFPS = 0.0
     @Published private(set) var hasStarted = false
@@ -65,8 +64,6 @@ final class WorkoutSessionModel: ObservableObject {
     private var speech: any WorkoutSpeaking
     private var cameraStorage: (any WorkoutCameraControlling)!
     var camera: any WorkoutCameraControlling { cameraStorage }
-    var currentCount: Int { currentExercise.map { totals[$0, default: 0] } ?? 0 }
-
     init(speech: (any WorkoutSpeaking)? = nil,
          cameraFactory: (@escaping @Sendable (Int, WorkoutCameraEvent) -> Void) -> any WorkoutCameraControlling = { WorkoutCamera(onEvent: $0) }) {
         self.speech = speech ?? WorkoutSpeech()
@@ -81,7 +78,6 @@ final class WorkoutSessionModel: ObservableObject {
         active = true
         generation += 1
         engine.resetTracking()
-        currentExercise = nil
         poseReady = false
         tracking = .searching
         cameraState = .requestingPermission
@@ -94,10 +90,9 @@ final class WorkoutSessionModel: ObservableObject {
         camera.stop()
         speech.stop()
         engine.resetTracking()
-        currentExercise = nil
         poseReady = false
         latestFrame = nil
-        angles = [:]
+        pushUpAngle = nil
         lastFrameAt = nil
         analysisFPS = 0
         cameraState = .idle
@@ -122,7 +117,7 @@ final class WorkoutSessionModel: ObservableObject {
         rotation = angle
         engine.resetTracking()
         latestFrame = nil
-        currentExercise = nil
+        pushUpAngle = nil
         speech.stop()
         camera.updateRotation(angle)
     }
@@ -137,10 +132,9 @@ final class WorkoutSessionModel: ObservableObject {
             if state != .running {
                 engine.resetTracking()
                 latestFrame = nil
-                currentExercise = nil
                 poseReady = false
                 tracking = .searching
-                angles = [:]
+                pushUpAngle = nil
                 lastFrameAt = nil
                 analysisFPS = 0
                 speech.stop()
@@ -153,22 +147,19 @@ final class WorkoutSessionModel: ObservableObject {
             lastFrameAt = frame.timestamp
             processingMilliseconds = milliseconds
             latestFrame = frame
-            let previous = currentExercise
             let update = engine.consume(frame)
-            currentExercise = update.exercise
             poseReady = update.poseReady
             tracking = update.tracking
-            angles = update.angles
+            pushUpAngle = update.pushUpAngle
             var counted = false
             for rep in update.reps.sorted(by: { $0.id < $1.id }) where rep.id > lastCreditedID {
-                totals[rep.exercise, default: 0] += 1
+                pushUpCount += 1
                 lastCreditedID = rep.id
                 counted = true
             }
             guard !isMuted else { return }
-            if counted, let exercise = currentExercise {
-                let count = totals[exercise, default: 0]
-                speech.say(previous != exercise ? "\(exercise.title). \(count)" : "\(count)")
+            if counted {
+                speech.say(pushUpCount == 1 ? "\(PushUp.title). \(pushUpCount)" : "\(pushUpCount)")
                 lastPromptAt = frame.timestamp
             } else if update.tracking != .tracking, update.tracking != .searching,
                       frame.timestamp - lastPromptAt >= 8 {

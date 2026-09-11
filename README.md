@@ -20,7 +20,7 @@ be cropped. The green/red readiness icon shows whether the required arm chain is
 currently visible. The debug build includes a tracking overlay with angles, frame
 rate, and Vision processing time.
 
-Video is processed locally and is not saved. Spoken exercise and repetition
+Video is processed locally and is not saved. Spoken push-up count
 feedback can be muted. The current feature counts a workout session but does not
 complete or unlock the daily app-blocking requirement.
 
@@ -191,11 +191,11 @@ to recognize push-ups, count repetitions, and provide spoken and on-screen
 feedback.
 
 - [`WorkoutView.swift`](pushapp-blocker/Features/Workout/WorkoutView.swift)
-  displays setup instructions, the live camera preview, repetition totals,
+  displays setup instructions, the live camera preview, the push-up count,
   tracking status, optional diagnostics, and the completed
   session summary. It also pauses and resumes with the app's scene phase.
 - [`WorkoutSessionModel.swift`](pushapp-blocker/Features/Workout/WorkoutSessionModel.swift)
-  coordinates the session lifecycle, totals, camera state, orientation, speech
+  coordinates the session lifecycle, push-up count, camera state, orientation, speech
   feedback, and published view state.
 - [`WorkoutCamera.swift`](pushapp-blocker/Features/Workout/WorkoutCamera.swift)
   owns camera permission, capture, Vision processing, interruptions, runtime
@@ -210,10 +210,10 @@ feedback.
 
 The view starts the session model, which starts the camera. The camera emits
 events and valid frames; the model passes frames to the recognition engine, then
-updates totals and optionally triggers `WorkoutSpeech`. The recognition engine
+updates the push-up count and optionally triggers `WorkoutSpeech`. The recognition engine
 has no camera, Vision, speech, persistence, or blocking dependencies.
 
 For changes, use the view for layout and controls, the session model for
 lifecycle and camera-event handling, the camera for capture and Vision behavior,
-the pose model for exercises and thresholds, and the recognition engine for
+the pose model for push-up joints and thresholds, and the recognition engine for
 repetition detection and tracking states.

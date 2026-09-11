@@ -84,10 +84,10 @@ struct WorkoutView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Set up your phone").font(.title.bold())
-                Text("Lean your phone securely against a wall with the screen facing you. Keep one person in view with the joints needed for your exercise visible. Rotate the phone if you need a wider view.")
+                Text("Lean your phone securely against a wall with the screen facing you. Keep one person in view with one shoulder, elbow, and wrist visible. Rotate the phone if you need a wider view.")
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(ExerciseKind.pushUp.title).font(.headline)
-                    Text(ExerciseKind.pushUp.placement)
+                    Text(PushUp.title).font(.headline)
+                    Text(PushUp.placement)
                 }
                 Text("Start with your arms extended. One rep is counted when your elbow angle gets smaller and then returns to the extended position.")
                 Text("Video stays on your phone and is not saved. This session counts reps; it does not unlock blocked apps.")
@@ -146,25 +146,25 @@ struct WorkoutView: View {
     /// A view that displays the push-up count, readiness, tracking messages, and optional diagnostics.
     private var controls: some View {
         VStack(spacing: 12) {
-            Text(model.currentExercise?.title ?? ExerciseKind.pushUp.title).font(.title2.bold())
-            Text("\(model.currentCount)").font(.system(size: 64, weight: .bold, design: .rounded))
-                .monospacedDigit().accessibilityLabel("\(model.currentCount) repetitions")
+            Text(PushUp.title).font(.title2.bold())
+            Text("\(model.pushUpCount)").font(.system(size: 64, weight: .bold, design: .rounded))
+                .monospacedDigit().accessibilityLabel("\(model.pushUpCount) repetitions")
             Image(systemName: model.poseReady ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .font(.title2)
                 .foregroundStyle(model.poseReady ? .green : .red)
                 .accessibilityLabel(model.poseReady ? "Pose ready" : "Pose not ready")
             Text(model.tracking.message).font(.callout).multilineTextAlignment(.center)
             if model.tracking == .reposition {
-                Text(ExerciseKind.pushUp.placement).font(.caption).foregroundStyle(.secondary)
+                Text(PushUp.placement).font(.caption).foregroundStyle(.secondary)
             }
-            totals
+            pushUpCountCard
             if developerMode {
                 Text(String(format: "%.1f fps · %.0f ms · %d usable joints", model.analysisFPS,
                             model.processingMilliseconds, model.latestFrame?.joints.values.filter(\.isUsable).count ?? 0))
                     .font(.caption.monospaced())
-                Text(ExerciseKind.allCases.compactMap { kind in
-                    model.angles[kind].map { "\(kind.title): \(Int($0))°" }
-                }.joined(separator: " · ")).font(.caption.monospaced())
+                if let angle = model.pushUpAngle {
+                    Text("\(PushUp.title): \(Int(angle))°").font(.caption.monospaced())
+                }
                 Text("Green: corroborated joint. Orange: rejected. A returned joint does not prove visibility.")
                     .font(.caption2)
             }
@@ -189,24 +189,23 @@ struct WorkoutView: View {
         }
     }
 
-    /// A view that displays the total counts for each exercise kind in a horizontal stack.
-    private var totals: some View {
-        HStack {
-            ForEach(ExerciseKind.allCases) { exercise in
-                VStack {
-                    Text("\(model.totals[exercise, default: 0])").font(.title3.bold()).monospacedDigit()
-                    Text(exercise.title).font(.caption)
-                }.frame(maxWidth: .infinity)
-            }
-        }.padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+    /// A view that displays the push-up count.
+    private var pushUpCountCard: some View {
+        VStack {
+            Text("\(model.pushUpCount)").font(.title3.bold()).monospacedDigit()
+            Text(PushUp.title).font(.caption)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// A view that displays a summary of the workout session, including an icon, completion message, totals, and a "Done" button to dismiss the view.
+    /// A view that displays a summary of the workout session, including an icon, completion message, push-up count, and a "Done" button to dismiss the view.
     private var summary: some View {
         VStack(spacing: 24) {
             Image(systemName: "figure.strengthtraining.traditional").font(.system(size: 60))
             Text("Session complete").font(.title.bold())
-            totals
+            pushUpCountCard
             Text("Your next session starts at zero.").foregroundStyle(.secondary)
             Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
         }.padding()
