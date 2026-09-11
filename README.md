@@ -3,6 +3,32 @@ App that blocks your distraction apps until you do your daily push up rep. It wi
 
 The app is in swift language using SwiftUI and SwiftData when possible. 
 
+## Workout recognition
+
+**Start Workout** opens a live, on-device camera session that recognizes and counts
+push-ups. It uses Vision's `VNDetectHumanBodyPoseRequest`, then counts a rep when
+the 2D elbow angle decreases and returns to the extended position.
+
+The app intentionally uses 2D pose observations rather than 3D observations:
+push-up counting only needs the shoulder-elbow-wrist geometry in the camera image,
+and the 2D pipeline better supports the intended side-view setup where the rest of
+the body may be cropped out.
+
+The phone should lean securely against a wall with one person in frame. Use a
+side view with one shoulder, elbow, and wrist visible; the rest of the body can
+be cropped. The green/red readiness icon shows whether the required arm chain is
+currently visible. The debug build includes a tracking overlay with angles, frame
+rate, and Vision processing time.
+
+Video is processed locally and is not saved. Spoken exercise and repetition
+feedback can be muted. The current feature counts a workout session but does not
+complete or unlock the daily app-blocking requirement.
+
+The iOS Simulator has no usable camera for Vision testing. Validate placements,
+lighting, phone angle, and different users on a physical iPhone. The recognition
+engine has deterministic tests for complete and partial reps, speed changes,
+tracking gaps, cropped bodies, and false-positive movements.
+
 ## Daily lock state
 
 The app shares one `BlockedAppsStore` through the SwiftUI environment. Its
@@ -16,7 +42,8 @@ new unlock. The caller should display that error and allow a retry.
 
 An unlock lasts for the current calendar day in the device's local time zone.
 The state refreshes on launch, foreground activation, and significant time changes
-(including midnight). The camera currently does not verify or complete workouts.
+(including midnight). Workout sessions currently do not verify or complete the
+daily unlock requirement.
 
 `DailyResetMonitor` is an embedded Device Activity extension with a repeating
 midnight-to-midnight schedule. iOS invokes it when the device is used after the
@@ -114,6 +141,78 @@ selected destination is remembered for the workspace. Do not commit a physical
 device UDID to `.vscode/settings.json`, because it is specific to one developer's
 device.
 
-The iOS Simulator does not provide a camera to this app. Selecting **Open Camera**
-in the simulator will therefore show the **Camera Unavailable** alert. Test camera
-functionality on a physical iPhone.
+The iOS Simulator does not provide a usable camera to this app. Start Workout in
+the simulator to inspect the UI; test live pose processing on a physical iPhone.
+
+## Code organization
+
+### Blocked Apps
+
+`BlockedAppsStore.swift` manages selected apps and blocking rules. It saves the
+selection, requests Screen Time access, applies restrictions, handles unlocking
+after a workout, and sets up the daily reset.
+
+`BlockedAppsView.swift` manages the user interface for selected apps, categories,
+websites, lock status, errors, the **Edit** button, and the app picker.
+
+When the view changes `store.selection`, the store saves the selection and updates
+blocking. SwiftUI refreshes the view when the store's published state changes.
+
+- **Appearance, text, or buttons:** [`BlockedAppsView.swift`](pushapp-blocker/Features/BlockedApps/BlockedAppsView.swift)
+- **Saving selections or blocking/unlocking behavior:** [`BlockedAppsStore.swift`](pushapp-blocker/Features/BlockedApps/BlockedAppsStore.swift)
+
+### Shared daily blocking logic
+
+[`DailyBlocking.swift`](Shared/DailyBlocking.swift) contains the blocking logic
+used by both the main app and the `DailyResetMonitor` extension. Xcode includes
+this source in both targets so they share one implementation.
+
+- **Main app:** saves selected apps, records workout completion, starts daily
+  monitoring, and updates restrictions.
+- **Monitor extension:** refreshes restrictions at daily schedule boundaries,
+  independently of the app's UI.
+
+[`AppSettings.swift`](Shared/AppSettings.swift) contains the App Group identifier
+used by both targets. It must match both targets' entitlements.
+
+`DailyBlocking.swift` also owns the blocking storage keys, monitoring schedule,
+named settings store, saved-data migration helpers, daily completion check, and
+restriction updates for apps, categories, and web domains. Storage key changes
+require a data migration.
+
+The `Shared` folder shares source code; the App Group's `UserDefaults` shares
+saved data between the app and extension. The folder name is a convention, not
+an Apple requirement.
+
+### Workout feature
+
+The Workout feature uses the iPhone's front camera and Vision body-pose tracking
+to recognize push-ups, count repetitions, and provide spoken and on-screen
+feedback.
+
+- [`WorkoutView.swift`](pushapp-blocker/Features/Workout/WorkoutView.swift)
+  displays setup instructions, the live camera preview, repetition totals,
+  tracking status, optional diagnostics, and the completed
+  session summary. It also pauses and resumes with the app's scene phase.
+- [`WorkoutSessionModel.swift`](pushapp-blocker/Features/Workout/WorkoutSessionModel.swift)
+  coordinates the session lifecycle, totals, camera state, orientation, speech
+  feedback, and published view state.
+- [`WorkoutCamera.swift`](pushapp-blocker/Features/Workout/WorkoutCamera.swift)
+  owns camera permission, capture, Vision processing, interruptions, runtime
+  errors, device rotation, and `PoseFrame` delivery.
+- [`WorkoutPose.swift`](pushapp-blocker/Features/Workout/WorkoutPose.swift)
+  defines the push-up arm-joint mapping, pose data, angle thresholds, and
+  visibility checks.
+- [`WorkoutRecognitionEngine.swift`](pushapp-blocker/Features/Workout/WorkoutRecognitionEngine.swift)
+  is the pure temporal push-up classifier. It smooths elbow angles, detects a
+  stable down-then-up cycle, and reports tracking status and repetitions.
+
+The view starts the session model, which starts the camera. The camera emits
+events and valid frames; the model passes frames to the recognition engine, then
+updates totals and optionally triggers `WorkoutSpeech`. The recognition engine
+has no camera, Vision, speech, persistence, or blocking dependencies.
+
+For changes, use the view for layout and controls, the session model for
+lifecycle and camera-event handling, the camera for capture and Vision behavior,
+the pose model for exercises and thresholds, and the recognition engine for
+repetition detection and tracking states.

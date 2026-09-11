@@ -64,21 +64,11 @@
 			);
 			target = DA1100000000000000000004 /* DailyResetMonitor */;
 		};
-		DA1100000000000000000010 /* Exceptions for "pushapp-blocker" folder in "pushapp-blocker" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Features/BlockedApps/README.md,
-			);
-			target = 97FA23BF3046F68600A48C8F /* pushapp-blocker */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		97FA23C23046F68600A48C8F /* pushapp-blocker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				DA1100000000000000000010 /* Exceptions for "pushapp-blocker" folder in "pushapp-blocker" target */,
-			);
 			path = "pushapp-blocker";
 			sourceTree = "<group>";
 		};

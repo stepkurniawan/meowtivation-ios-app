@@ -30,7 +30,6 @@ struct ContentView: View {
     @State private var commandError: String?
     @State private var isLandingVisible = false
     @State private var isCameraOpen = false
-    @State private var isShowingCameraUnavailable = false
 
     var body: some View {
         NavigationStack {
@@ -42,9 +41,9 @@ struct ContentView: View {
                     .fontWeight(.bold)
 
                 Button {
-                    openCamera()
+                    openWorkout()
                 } label: {
-                    Label("Open Camera", systemImage: "camera.fill")
+                    Label("Start Workout", systemImage: "figure.strengthtraining.traditional")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
@@ -88,7 +87,6 @@ struct ContentView: View {
             }
             .onChange(of: scenePhase) { _, _ in resetTapProgress() }
             .onChange(of: isCameraOpen) { _, _ in resetTapProgress() }
-            .onChange(of: isShowingCameraUnavailable) { _, _ in resetTapProgress() }
             .onChange(of: commandError) { _, _ in resetTapProgress() }
             .overlay(alignment: .bottom) {
                 if let statusMessage {
@@ -115,14 +113,8 @@ struct ContentView: View {
             } message: {
                 Text(commandError ?? "Unable to change restrictions.")
             }
-            .sheet(isPresented: $isCameraOpen) {
-                CameraView()
-                    .ignoresSafeArea()
-            }
-            .alert("Camera Unavailable", isPresented: $isShowingCameraUnavailable) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("This device does not have an available camera.")
+            .fullScreenCover(isPresented: $isCameraOpen) {
+                WorkoutView()
             }
         }
     }
@@ -134,7 +126,7 @@ struct ContentView: View {
 
     private func handleCornerTap(_ side: TapSide) {
         guard isLandingVisible, scenePhase == .active, !isCameraOpen,
-              !isShowingCameraUnavailable, commandError == nil else { return }
+              commandError == nil else { return }
         let timestamp = ProcessInfo.processInfo.systemUptime
         if let lastTap, timestamp - lastTap > 1.5 { resetTapProgress() }
         lastTap = timestamp
@@ -159,50 +151,9 @@ struct ContentView: View {
         }
     }
 
-    private func openCamera() {
+    private func openWorkout() {
         resetTapProgress()
-        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-            isCameraOpen = true
-        } else {
-            isShowingCameraUnavailable = true
-        }
-    }
-}
-
-struct CameraView: UIViewControllerRepresentable {
-    @Environment(\.dismiss) private var dismiss
-
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.sourceType = .camera
-        picker.cameraCaptureMode = .photo
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) { }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(dismiss: dismiss)
-    }
-
-    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-        private let dismiss: DismissAction
-
-        init(dismiss: DismissAction) {
-            self.dismiss = dismiss
-        }
-
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            dismiss()
-        }
-
-        func imagePickerController(
-            _ picker: UIImagePickerController,
-            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
-        ) {
-            dismiss()
-        }
+        isCameraOpen = true
     }
 }
 
