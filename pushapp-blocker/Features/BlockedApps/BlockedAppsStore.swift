@@ -6,6 +6,7 @@ import ManagedSettings
 @MainActor
 final class BlockedAppsStore: ObservableObject {
     @Published private(set) var isLocked = true
+    @Published private(set) var hasDeveloperOverride = false
     @Published private(set) var monitoringError: String?
 
     @Published var selection: FamilyActivitySelection {
@@ -22,17 +23,32 @@ final class BlockedAppsStore: ObservableObject {
     private let calendar: Calendar
     private let startMonitoring: () throws -> Void
 
+    private let authorizationCheck: () -> Bool
+
+    enum DeveloperOverrideError: LocalizedError {
+        case authorizationRequired
+
+        var errorDescription: String? {
+            "Allow Screen Time access in Blocked Apps before changing restrictions."
+        }
+    }
+
     init(
         defaults: UserDefaults? = nil,
         now: @escaping () -> Date = Date.init,
         calendar: Calendar = .autoupdatingCurrent,
-        startMonitoring: @escaping () throws -> Void = DailyBlocking.startMonitoring
+        startMonitoring: @escaping () throws -> Void = DailyBlocking.startMonitoring,
+        authorizationCheck: @escaping () -> Bool = {
+            let status = AuthorizationCenter.shared.authorizationStatus
+            return status == .approved || status == .approvedWithDataAccess
+        }
     ) {
         let sharedDefaults: UserDefaults = defaults ?? DailyBlocking.defaults
         self.defaults = sharedDefaults
         self.now = now
         self.calendar = calendar
         self.startMonitoring = startMonitoring
+        self.authorizationCheck = authorizationCheck
 
         selection = DailyBlocking.selection(from: sharedDefaults)
 
@@ -51,6 +67,14 @@ final class BlockedAppsStore: ObservableObject {
         refreshLockState()
     }
 
+    func setDeveloperLockOverride(isLocked: Bool) throws {
+        guard isAuthorized else { throw DeveloperOverrideError.authorizationRequired }
+        if !isLocked { try ensureDailyReset() }
+        let override = DailyBlocking.DeveloperOverride(isLocked: isLocked, date: now())
+        defaults.set(try JSONEncoder().encode(override), forKey: DailyBlocking.developerOverrideKey)
+        refreshLockState()
+    }
+
     func refreshLockState() {
         if isAuthorized {
             do {
@@ -59,7 +83,9 @@ final class BlockedAppsStore: ObservableObject {
                 // ensureDailyReset publishes the error for the screen to display.
             }
         }
-        isLocked = DailyBlocking.isLocked(in: defaults, now: now(), calendar: calendar)
+        let date = now()
+        hasDeveloperOverride = DailyBlocking.developerOverride(in: defaults, now: date, calendar: calendar) != nil
+        isLocked = DailyBlocking.isLocked(in: defaults, now: date, calendar: calendar)
         DailyBlocking.apply(selection: selection, isLocked: isLocked, to: managedSettings)
     }
 
@@ -77,8 +103,7 @@ final class BlockedAppsStore: ObservableObject {
     }
 
     private var isAuthorized: Bool {
-        let status: AuthorizationStatus = AuthorizationCenter.shared.authorizationStatus
-        return status == .approved || status == .approvedWithDataAccess
+        authorizationCheck()
     }
 
     private func ensureDailyReset() throws {

@@ -7,6 +7,20 @@ import ManagedSettings // ManagedSettingsStore
 nonisolated enum DailyBlocking {
     static let selectionKey = "blockedAppsSelection"
     static let workoutCompletionKey = "dailyWorkoutCompletedAt"
+    static let developerOverrideKey = "developerLockOverride"
+
+    struct DeveloperOverride: Codable {
+        let isLocked: Bool
+        let date: Date
+    }
+
+    static func developerOverride(in defaults: UserDefaults, now: Date, calendar: Calendar = .autoupdatingCurrent) -> DeveloperOverride? {
+        guard let data = defaults.data(forKey: developerOverrideKey),
+              let override = try? JSONDecoder().decode(DeveloperOverride.self, from: data),
+              calendar.isDate(override.date, inSameDayAs: now) else { return nil }
+        return override
+    }
+
     static let activity = DeviceActivityName("dailyWorkoutReset")
     static let storeName = ManagedSettingsStore.Name("dailyWorkout")
     static let defaults = UserDefaults(suiteName: AppSettings.appGroup)!
@@ -50,14 +64,17 @@ nonisolated enum DailyBlocking {
 
     /// Determines whether app blocking is currently active.
     ///
-    /// Checks if a workout completion timestamp exists in user defaults and whether it occurred on the same day as the provided date.
-    /// Blocking is active if no completion time is found or if the completion occurred on a previous day.
+    /// Uses today's developer override when present; otherwise checks today's workout completion.
+    /// Blocking is active by default when neither grants an unlock.
     /// - Parameters:
     ///   - defaults: The `UserDefaults` instance containing the completion timestamp.
     ///   - now: The date to check against the completion date.
     ///   - calendar: The calendar to use for date comparison (defaults to the autoupdating current calendar).
-    /// - Returns: `true` if blocking should be active, `false` if the workout was completed today.
+    /// - Returns: Whether blocking should be active for the provided date.
     static func isLocked(in defaults: UserDefaults, now: Date, calendar: Calendar = .autoupdatingCurrent) -> Bool {
+        if let override = developerOverride(in: defaults, now: now, calendar: calendar) {
+            return override.isLocked
+        }
         guard let completedAt: Date = defaults.object(forKey: workoutCompletionKey) as? Date else { return true }
         return !calendar.isDate(completedAt, inSameDayAs: now)
     }

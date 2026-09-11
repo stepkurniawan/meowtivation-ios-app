@@ -107,4 +107,76 @@ struct pushapp_blockerTests {
         #expect(store.isLocked)
     }
 
+    @MainActor
+    @Test func developerOverridePersistsAndExpiresWithoutChangingWorkout() throws {
+        let suite = "DeveloperOverrideTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Europe/Berlin"))
+        var now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 10, hour: 23, minute: 59)))
+        let completedAt = now
+        defaults.set(completedAt, forKey: DailyBlocking.workoutCompletionKey)
+        let store = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar,
+                                     startMonitoring: {}, authorizationCheck: { true })
+        let selectionData = try JSONEncoder().encode(FamilyActivitySelection(includeEntireCategory: true))
+        defaults.set(selectionData, forKey: DailyBlocking.selectionKey)
+        try store.setDeveloperLockOverride(isLocked: true)
+        #expect(store.isLocked && store.hasDeveloperOverride)
+        let independentDefaults = try #require(UserDefaults(suiteName: suite))
+        #expect(DailyBlocking.isLocked(in: independentDefaults, now: now, calendar: calendar))
+        let reopened = BlockedAppsStore(defaults: independentDefaults, now: { now }, calendar: calendar,
+                                        startMonitoring: {}, authorizationCheck: { true })
+        #expect(reopened.isLocked && reopened.hasDeveloperOverride)
+        try store.setDeveloperLockOverride(isLocked: false)
+        #expect(!DailyBlocking.isLocked(in: independentDefaults, now: now, calendar: calendar))
+        #expect(defaults.object(forKey: DailyBlocking.workoutCompletionKey) as? Date == completedAt)
+        #expect(defaults.data(forKey: DailyBlocking.selectionKey) == selectionData)
+        now = now.addingTimeInterval(60)
+        reopened.refreshLockState()
+        #expect(reopened.isLocked && !reopened.hasDeveloperOverride)
+        #expect(DailyBlocking.isLocked(in: independentDefaults, now: now, calendar: calendar))
+        try reopened.completeDailyWorkout()
+        #expect(!reopened.isLocked)
+        try reopened.setDeveloperLockOverride(isLocked: true)
+        #expect(reopened.isLocked)
+        now = now.addingTimeInterval(24 * 60 * 60)
+        defaults.set(now, forKey: DailyBlocking.workoutCompletionKey)
+        reopened.refreshLockState()
+        #expect(!reopened.isLocked && !reopened.hasDeveloperOverride)
+    }
+
+    @MainActor
+    @Test func developerCommandsHandleAuthorizationAndScheduleFailures() throws {
+        enum ScheduleError: Error { case unavailable }
+        let suite = "DeveloperOverrideTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var authorized = true
+        var failSchedule = false
+        let store = BlockedAppsStore(defaults: defaults, startMonitoring: {
+            if failSchedule { throw ScheduleError.unavailable }
+        }, authorizationCheck: { authorized })
+        try store.setDeveloperLockOverride(isLocked: false)
+        failSchedule = true
+        try store.setDeveloperLockOverride(isLocked: true)
+        #expect(store.isLocked && store.monitoringError != nil)
+        let previous = defaults.data(forKey: DailyBlocking.developerOverrideKey)
+        #expect(throws: ScheduleError.self) { try store.setDeveloperLockOverride(isLocked: false) }
+        #expect(store.isLocked)
+        #expect(defaults.data(forKey: DailyBlocking.developerOverrideKey) == previous)
+        authorized = false
+        for isLocked in [true, false] {
+            #expect(throws: BlockedAppsStore.DeveloperOverrideError.self) {
+                try store.setDeveloperLockOverride(isLocked: isLocked)
+            }
+        }
+        #expect(defaults.data(forKey: DailyBlocking.developerOverrideKey) == previous)
+        failSchedule = false
+        authorized = true
+        try store.setDeveloperLockOverride(isLocked: false)
+        #expect(!store.isLocked && store.monitoringError == nil)
+        #expect(defaults.object(forKey: DailyBlocking.workoutCompletionKey) == nil)
+    }
+
 }

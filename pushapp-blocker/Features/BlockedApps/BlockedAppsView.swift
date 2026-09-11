@@ -16,7 +16,9 @@ struct BlockedAppsView: View {
         List {
             Section {
                 Label(
-                    store.isLocked ? "Workout needed to unlock" : "Unlocked for today",
+                    store.hasDeveloperOverride
+                        ? (store.isLocked ? "Developer override: blocked today" : "Developer override: unlocked today")
+                        : (store.isLocked ? "Workout needed to unlock" : "Unlocked for today"),
                     systemImage: store.isLocked ? "lock.fill" : "lock.open.fill"
                 )
                 if let error = store.monitoringError {
