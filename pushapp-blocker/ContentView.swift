@@ -40,17 +40,6 @@ struct ContentView: View {
                 Text("PushApp Blocker")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .overlay {
-                        GeometryReader { geometry in
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture { location in
-                                    handleTitleTap(location.x < geometry.size.width / 2 ? .left : .right)
-                                }
-                        }
-                        .frame(minHeight: 44)
-                        .accessibilityHidden(true)
-                    }
 
                 Button {
                     openCamera()
@@ -75,6 +64,22 @@ struct ContentView: View {
                 .padding(.horizontal, 40)
 
                 Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .bottom) {
+                HStack(spacing: 0) {
+                    Color.clear
+                        .frame(width: 96, height: 96)
+                        .contentShape(Rectangle())
+                        .onTapGesture { handleCornerTap(.left) }
+                    Spacer()
+                    Color.clear
+                        .frame(width: 96, height: 96)
+                        .contentShape(Rectangle())
+                        .onTapGesture { handleCornerTap(.right) }
+                }
+                .ignoresSafeArea(.container, edges: .bottom)
+                .accessibilityHidden(true)
             }
             .onAppear { isLandingVisible = true }
             .onDisappear {
@@ -127,7 +132,7 @@ struct ContentView: View {
         lastTap = nil
     }
 
-    private func handleTitleTap(_ side: TapSide) {
+    private func handleCornerTap(_ side: TapSide) {
         guard isLandingVisible, scenePhase == .active, !isCameraOpen,
               !isShowingCameraUnavailable, commandError == nil else { return }
         let timestamp = ProcessInfo.processInfo.systemUptime
