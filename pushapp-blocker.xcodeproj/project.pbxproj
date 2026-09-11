@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		97FA23ED304817DD00A48C8F /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 97FA23EC304817DD00A48C8F /* README.md */; };
 		DA1100000000000000000001 /* DailyResetMonitor.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = DA1100000000000000000002 /* DailyResetMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -330,7 +329,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				97FA23ED304817DD00A48C8F /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
