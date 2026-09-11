@@ -19,6 +19,10 @@ struct BlockedAppsView: View {
                     store.isLocked ? "Workout needed to unlock" : "Unlocked for today",
                     systemImage: store.isLocked ? "lock.fill" : "lock.open.fill"
                 )
+                if let error = store.monitoringError {
+                    Text("Daily reset unavailable: \(error)")
+                        .foregroundStyle(.red)
+                }
             }
 
             if !hasSelection {
@@ -69,7 +73,7 @@ struct BlockedAppsView: View {
             isPresented: $isPickerPresented,
             selection: $store.selection
         )
-        .alert("Screen Time Access Needed", isPresented: isAuthorizationAlertPresented) {
+        .alert("App Blocking Setup Failed", isPresented: isAuthorizationAlertPresented) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(authorizationError ?? "Allow Screen Time access to choose apps.")

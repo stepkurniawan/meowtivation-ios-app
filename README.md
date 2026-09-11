@@ -8,16 +8,44 @@ The app is in swift language using SwiftUI and SwiftData when possible.
 The app shares one `BlockedAppsStore` through the SwiftUI environment. Its
 read-only `isLocked` state controls shields for the selected apps, categories,
 and websites. The future workout completion flow should call
-`completeDailyWorkout()` on that shared store after a successful workout.
+`try completeDailyWorkout()` on that shared store after a successful workout.
 This removes the shields without clearing the selection and saves the completion
-date in UserDefaults so the unlock survives app restarts.
+date in shared App Group UserDefaults so the unlock survives app restarts.
+If registering the daily schedule fails, the method throws and does not grant a
+new unlock. The caller should display that error and allow a retry.
 
 An unlock lasts for the current calendar day in the device's local time zone.
 The state refreshes on launch, foreground activation, and significant time changes
 (including midnight). The camera currently does not verify or complete workouts.
-Reapplying shields at midnight while the app is suspended or closed still requires
-a Device Activity monitoring extension; until then, shields reset when the app
-next becomes active.
+
+`DailyResetMonitor` is an embedded Device Activity extension with a repeating
+midnight-to-midnight schedule. iOS invokes it when the device is used after the
+daily boundary, even if PushApp Blocker is closed. It reads the saved selection
+and workout date, then reapplies shields if no workout was completed that day.
+Both interval callbacks check the date; neither blindly unlocks apps or overwrites
+a workout completed before a delayed callback. The app and extension use the same
+named Managed Settings store so either can update the shields.
+
+### Daily reset setup and verification
+
+- Both the app and `DailyResetMonitor` targets need the same signing team,
+  **Family Controls**, and the App Group `group.com.stepkurniawan.pushapp-blocker`.
+  The project includes these settings; Xcode must provision the App Group and both
+  targets for your Apple Developer account. If you change the group identifier,
+  update both entitlement files and `Shared/DailyBlocking.swift` together.
+- Distribution requires Family Controls entitlement approval for both bundle IDs.
+- On a physical iPhone, grant Screen Time access using **Blocked Apps > Edit**
+  and select a game. Confirm it is blocked, then call `try completeDailyWorkout()`
+  on the shared store through the debugger or the future workout flow. Confirm
+  the game unlocks, close PushApp Blocker, and use the device after local midnight.
+  Open the game directly: it should be shielded without reopening PushApp Blocker.
+  Repeat after skipping several days and after completing another workout.
+- Unit tests cover shared date/selection reads, skipped days, delayed callbacks,
+  daylight-saving boundaries, migration, and scheduling failures. Actual iOS
+  callback delivery and Screen Time shields require physical-device verification.
+
+Apple documents delivery on device use, not a guaranteed wall-clock execution
+exactly at midnight: [DeviceActivityCenter](https://developer.apple.com/documentation/deviceactivity/deviceactivitycenter).
 
 ## Run the app
 

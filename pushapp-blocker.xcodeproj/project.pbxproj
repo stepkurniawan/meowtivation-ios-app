@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		97FA23ED304817DD00A48C8F /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 97FA23EC304817DD00A48C8F /* README.md */; };
+		DA1100000000000000000001 /* DailyResetMonitor.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = DA1100000000000000000002 /* DailyResetMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,18 +26,60 @@
 			remoteGlobalIDString = 97FA23BF3046F68600A48C8F;
 			remoteInfo = "pushapp-blocker";
 		};
+		DA1100000000000000000003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97FA23B83046F68600A48C8F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA1100000000000000000004;
+			remoteInfo = DailyResetMonitor;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DA1100000000000000000005 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				DA1100000000000000000001 /* DailyResetMonitor.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		97FA23C03046F68600A48C8F /* pushapp-blocker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "pushapp-blocker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		97FA23CF3046F68800A48C8F /* pushapp-blockerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "pushapp-blockerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		97FA23D93046F68800A48C8F /* pushapp-blockerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "pushapp-blockerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		97FA23EC304817DD00A48C8F /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		DA1100000000000000000002 /* DailyResetMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DailyResetMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DA1100000000000000000006 /* Exceptions for "DailyResetMonitor" folder in "DailyResetMonitor" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DA1100000000000000000004 /* DailyResetMonitor */;
+		};
+		DA1100000000000000000010 /* Exceptions for "pushapp-blocker" folder in "pushapp-blocker" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Features/BlockedApps/README.md,
+			);
+			target = 97FA23BF3046F68600A48C8F /* pushapp-blocker */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		97FA23C23046F68600A48C8F /* pushapp-blocker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DA1100000000000000000010 /* Exceptions for "pushapp-blocker" folder in "pushapp-blocker" target */,
+			);
 			path = "pushapp-blocker";
 			sourceTree = "<group>";
 		};
@@ -48,6 +91,19 @@
 		97FA23DC3046F68800A48C8F /* pushapp-blockerUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "pushapp-blockerUITests";
+			sourceTree = "<group>";
+		};
+		DA1100000000000000000007 /* DailyResetMonitor */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DA1100000000000000000006 /* Exceptions for "DailyResetMonitor" folder in "DailyResetMonitor" target */,
+			);
+			path = DailyResetMonitor;
+			sourceTree = "<group>";
+		};
+		DA1100000000000000000008 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -74,6 +130,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA1100000000000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -82,6 +145,8 @@
 			children = (
 				97FA23EC304817DD00A48C8F /* README.md */,
 				97FA23C23046F68600A48C8F /* pushapp-blocker */,
+				DA1100000000000000000007 /* DailyResetMonitor */,
+				DA1100000000000000000008 /* Shared */,
 				97FA23D23046F68800A48C8F /* pushapp-blockerTests */,
 				97FA23DC3046F68800A48C8F /* pushapp-blockerUITests */,
 				97FA23C13046F68600A48C8F /* Products */,
@@ -92,6 +157,7 @@
 			isa = PBXGroup;
 			children = (
 				97FA23C03046F68600A48C8F /* pushapp-blocker.app */,
+				DA1100000000000000000002 /* DailyResetMonitor.appex */,
 				97FA23CF3046F68800A48C8F /* pushapp-blockerTests.xctest */,
 				97FA23D93046F68800A48C8F /* pushapp-blockerUITests.xctest */,
 			);
@@ -108,13 +174,16 @@
 				97FA23BC3046F68600A48C8F /* Sources */,
 				97FA23BD3046F68600A48C8F /* Frameworks */,
 				97FA23BE3046F68600A48C8F /* Resources */,
+				DA1100000000000000000005 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				DA110000000000000000000D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				97FA23C23046F68600A48C8F /* pushapp-blocker */,
+				DA1100000000000000000008 /* Shared */,
 			);
 			name = "pushapp-blocker";
 			packageProductDependencies = (
@@ -169,6 +238,29 @@
 			productReference = 97FA23D93046F68800A48C8F /* pushapp-blockerUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		DA1100000000000000000004 /* DailyResetMonitor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA110000000000000000000A /* Build configuration list for PBXNativeTarget "DailyResetMonitor" */;
+			buildPhases = (
+				DA110000000000000000000B /* Sources */,
+				DA1100000000000000000009 /* Frameworks */,
+				DA110000000000000000000C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DA1100000000000000000007 /* DailyResetMonitor */,
+				DA1100000000000000000008 /* Shared */,
+			);
+			name = DailyResetMonitor;
+			packageProductDependencies = (
+			);
+			productName = DailyResetMonitor;
+			productReference = DA1100000000000000000002 /* DailyResetMonitor.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -182,6 +274,9 @@
 					97FA23BF3046F68600A48C8F = {
 						CreatedOnToolsVersion = 26.6;
 						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
 							com.apple.FamilyControls = {
 								enabled = 1;
 							};
@@ -194,6 +289,17 @@
 					97FA23D83046F68800A48C8F = {
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = 97FA23BF3046F68600A48C8F;
+					};
+					DA1100000000000000000004 = {
+						CreatedOnToolsVersion = 26.6;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+							com.apple.FamilyControls = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};
@@ -211,6 +317,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				DA1100000000000000000004 /* DailyResetMonitor */,
 				97FA23BF3046F68600A48C8F /* pushapp-blocker */,
 				97FA23CE3046F68800A48C8F /* pushapp-blockerTests */,
 				97FA23D83046F68800A48C8F /* pushapp-blockerUITests */,
@@ -241,6 +348,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA110000000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -265,6 +379,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA110000000000000000000B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -277,6 +398,11 @@
 			isa = PBXTargetDependency;
 			target = 97FA23BF3046F68600A48C8F /* pushapp-blocker */;
 			targetProxy = 97FA23DA3046F68800A48C8F /* PBXContainerItemProxy */;
+		};
+		DA110000000000000000000D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DA1100000000000000000004 /* DailyResetMonitor */;
+			targetProxy = DA1100000000000000000003 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -548,6 +674,54 @@
 			};
 			name = Release;
 		};
+		DA110000000000000000000E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = DailyResetMonitor/DailyResetMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K9FT2YTWMF;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DailyResetMonitor/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.stepkurniawan.pushapp-blocker.DailyResetMonitor";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DA110000000000000000000F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = DailyResetMonitor/DailyResetMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K9FT2YTWMF;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DailyResetMonitor/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.stepkurniawan.pushapp-blocker.DailyResetMonitor";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -583,6 +757,15 @@
 			buildConfigurations = (
 				97FA23EA3046F68800A48C8F /* Debug */,
 				97FA23EB3046F68800A48C8F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA110000000000000000000A /* Build configuration list for PBXNativeTarget "DailyResetMonitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA110000000000000000000E /* Debug */,
+				DA110000000000000000000F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

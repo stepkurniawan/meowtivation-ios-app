@@ -6,6 +6,7 @@ import ManagedSettings
 @MainActor
 final class BlockedAppsStore: ObservableObject {
     @Published private(set) var isLocked = true
+    @Published private(set) var monitoringError: String?
 
     @Published var selection: FamilyActivitySelection {
         didSet {
@@ -16,79 +17,77 @@ final class BlockedAppsStore: ObservableObject {
     }
 
     private let defaults: UserDefaults
-    private let managedSettings = ManagedSettingsStore()
-    private let selectionKey = "blockedAppsSelection"
-
-    private let workoutCompletionKey = "dailyWorkoutCompletedAt"
+    private let managedSettings = ManagedSettingsStore(named: DailyBlocking.storeName)
     private let now: () -> Date
     private let calendar: Calendar
+    private let startMonitoring: () throws -> Void
 
     init(
-        defaults: UserDefaults = .standard,
+        defaults: UserDefaults? = nil,
         now: @escaping () -> Date = Date.init,
-        calendar: Calendar = .autoupdatingCurrent
+        calendar: Calendar = .autoupdatingCurrent,
+        startMonitoring: @escaping () throws -> Void = DailyBlocking.startMonitoring
     ) {
-        self.defaults = defaults
+        let sharedDefaults: UserDefaults = defaults ?? DailyBlocking.defaults
+        self.defaults = sharedDefaults
         self.now = now
         self.calendar = calendar
+        self.startMonitoring = startMonitoring
 
-        if let data = defaults.data(forKey: selectionKey),
-           let savedSelection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data) {
-            selection = savedSelection
-        } else {
-            selection = FamilyActivitySelection()
-        }
+        selection = DailyBlocking.selection(from: sharedDefaults)
 
         refreshLockState()
+        if defaults == nil {
+            // Older builds used the app's unnamed store. Remove those shields.
+            DailyBlocking.apply(selection: selection, isLocked: false, to: ManagedSettingsStore())
+        }
     }
 
     /// Call only after the daily workout has been successfully completed.
-    func completeDailyWorkout() {
-        defaults.set(now(), forKey: workoutCompletionKey)
+    func completeDailyWorkout() throws {
+        // Do not grant an unlock unless iOS has accepted the repeating reset schedule.
+        try ensureDailyReset()
+        defaults.set(now(), forKey: DailyBlocking.workoutCompletionKey)
         refreshLockState()
     }
 
     func refreshLockState() {
-        if let completedAt = defaults.object(forKey: workoutCompletionKey) as? Date {
-            isLocked = !calendar.isDate(completedAt, inSameDayAs: now())
-        } else {
-            isLocked = true
+        if isAuthorized {
+            do {
+                try ensureDailyReset()
+            } catch {
+                // ensureDailyReset publishes the error for the screen to display.
+            }
         }
-        applySelection()
+        isLocked = DailyBlocking.isLocked(in: defaults, now: now(), calendar: calendar)
+        DailyBlocking.apply(selection: selection, isLocked: isLocked, to: managedSettings)
     }
 
     func requestAuthorization() async throws {
-        let authorizationCenter = AuthorizationCenter.shared
-
-        guard authorizationCenter.authorizationStatus != .approved,
-              authorizationCenter.authorizationStatus != .approvedWithDataAccess else {
-            return
+        if !isAuthorized {
+            try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
         }
-
-        try await authorizationCenter.requestAuthorization(for: .individual)
+        try ensureDailyReset()
+        refreshLockState()
     }
 
     private func saveSelection() {
         guard let data = try? JSONEncoder().encode(selection) else { return }
-        defaults.set(data, forKey: selectionKey)
+        defaults.set(data, forKey: DailyBlocking.selectionKey)
     }
 
-    private func applySelection() {
-        guard isLocked else {
-            managedSettings.shield.applications = nil
-            managedSettings.shield.applicationCategories = nil
-            managedSettings.shield.webDomains = nil
-            return
-        }
+    private var isAuthorized: Bool {
+        let status: AuthorizationStatus = AuthorizationCenter.shared.authorizationStatus
+        return status == .approved || status == .approvedWithDataAccess
+    }
 
-        managedSettings.shield.applications = selection.applicationTokens.isEmpty
-            ? nil
-            : selection.applicationTokens
-        managedSettings.shield.applicationCategories = selection.categoryTokens.isEmpty
-            ? nil
-            : .specific(selection.categoryTokens)
-        managedSettings.shield.webDomains = selection.webDomainTokens.isEmpty
-            ? nil
-            : selection.webDomainTokens
+    private func ensureDailyReset() throws {
+        do {
+            try startMonitoring()
+            monitoringError = nil
+        } catch {
+            monitoringError = error.localizedDescription
+            throw error
+        }
     }
 }
