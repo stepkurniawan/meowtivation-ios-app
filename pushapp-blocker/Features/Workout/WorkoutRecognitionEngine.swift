@@ -31,8 +31,6 @@ nonisolated private struct CycleDetector {
     enum Phase { case waiting, extended, contracted }
     var phase = Phase.waiting
     var startedAt = 0.0
-    var smoothedAngle: Float?
-    var lastTimestamp: TimeInterval?
     var side: Int?
 
     mutating func consume(_ raw: ExerciseSample, at time: TimeInterval) -> Bool {
@@ -41,15 +39,10 @@ nonisolated private struct CycleDetector {
         }
         side = raw.side
 
-        let angle: Float
-        if let previous = smoothedAngle, let lastTimestamp {
-            let alpha = Float(1 - exp(-(time - lastTimestamp) / RecognitionParameters.smoothingTime))
-            angle = previous + alpha * (raw.angle - previous)
-        } else {
-            angle = raw.angle
-        }
-        smoothedAngle = angle
-        lastTimestamp = time
+        // PoseStabilizer has already filtered the joint coordinates. Use that
+        // stabilized angle directly so a quick recovery can complete a rep
+        // without waiting for a second filter to catch up.
+        let angle = raw.angle
 
         if phase != .waiting, time - startedAt > RecognitionParameters.maximumCycleDuration {
             phase = .waiting
@@ -57,6 +50,9 @@ nonisolated private struct CycleDetector {
 
         switch phase {
         case .waiting:
+            guard angle >= RecognitionParameters.minimumRecoveryAngle else {
+                return false
+            }
             phase = .extended
             startedAt = time
         case .extended:

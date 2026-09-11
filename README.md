@@ -204,8 +204,9 @@ feedback.
   defines the push-up arm-joint mapping, pose data, angle thresholds, and
   visibility checks.
 - [`WorkoutRecognitionEngine.swift`](pushapp-blocker/Features/Workout/WorkoutRecognitionEngine.swift)
-  is the pure temporal push-up classifier. It smooths elbow angles, detects a
-  stable down-then-up cycle, and reports tracking status and repetitions.
+  is the pure temporal push-up classifier. It uses stabilized elbow angles,
+  detects a stable down-then-up cycle, and reports tracking status and
+  repetitions.
 
 The view starts the session model, which starts the camera. The camera emits
 events and valid frames; the model passes frames to the recognition engine, then

@@ -26,6 +26,27 @@ nonisolated enum WorkoutFixtures {
         return PoseFrame(timestamp: time, joints: joints)
     }
 
+    static func frame(angle: Float, time: Double) -> PoseFrame {
+        let radians = angle * .pi / 180
+        let elbow: SIMD2<Float> = [0.5, 0.5]
+        let shoulder = elbow + SIMD2<Float>(-0.3, 0)
+        let wristRadians = .pi - radians
+        let wrist = elbow + SIMD2<Float>(0.3 * cos(wristRadians), 0.3 * sin(wristRadians))
+
+        var joints: [BodyJoint: PoseJoint] = [:]
+        for (sideIndex, side) in BodyJoint.sides.enumerated() {
+            let offset = SIMD2<Float>(0, Float(sideIndex) * 0.2)
+            let positions = [shoulder, elbow, wrist].map { $0 + offset }
+            for (index, joint) in side.prefix(3).enumerated() {
+                let position = positions[index]
+                joints[joint] = PoseJoint(position: position,
+                    imagePoint: position,
+                    confidence2D: 0.95)
+            }
+        }
+        return PoseFrame(timestamp: time, joints: joints)
+    }
+
     static func sequence(reps: Int = 3, duration: Double = 2.4,
                          start: Double = 1, amplitude: Float = 1,
                          sampleFPS: Double = RecognitionParameters.targetFPS) -> [PoseFrame] {
@@ -66,6 +87,21 @@ struct WorkoutRecognitionTests {
         #expect(events.count == 1)
     }
 
+    @Test func countsFastConsecutiveRepsAfterPoseStabilization() {
+        var stabilizer = PoseStabilizer()
+        var engine = WorkoutRecognitionEngine()
+        let frames = WorkoutFixtures.sequence(reps: 3, duration: 0.4,
+                                               sampleFPS: RecognitionParameters.targetFPS).map { frame in
+            var stabilized = frame
+            stabilized.joints = stabilizer.stabilize(frame.joints, at: frame.timestamp)
+            return stabilized
+        }
+
+        let angles = frames.compactMap { PoseFeatures.pushUpSamples(from: $0).first?.angle }
+        let events = frames.flatMap { engine.consume($0).reps }
+        #expect(events.count == 3, "angles: \(angles.map { Int($0) })")
+    }
+
     @Test func countsThirtyHundredthsSecondDownAndUpCycle() {
         var engine = WorkoutRecognitionEngine()
         let frames = [
@@ -79,8 +115,19 @@ struct WorkoutRecognitionTests {
 
     @Test func countsCycleThatReachesPragmaticDepth() {
         var engine = WorkoutRecognitionEngine()
-        let events = WorkoutFixtures.sequence(amplitude: 0.55).flatMap { engine.consume($0).reps }
+        let events = WorkoutFixtures.sequence(amplitude: 0.70).flatMap { engine.consume($0).reps }
         #expect(events.count == 3)
+    }
+
+    @Test func countsAtMaximumContractedAngle() {
+        var engine = WorkoutRecognitionEngine()
+        let frames = [
+            WorkoutFixtures.frame(angle: 160, time: 1.0),
+            WorkoutFixtures.frame(angle: 90, time: 1.2),
+            WorkoutFixtures.frame(angle: 160, time: 1.4)
+        ]
+
+        #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
     }
 
     @Test func doesNotCountShallowAngleCycles() {
@@ -95,6 +142,32 @@ struct WorkoutRecognitionTests {
             WorkoutFixtures.frame(contraction: 0, time: 1),
             WorkoutFixtures.frame(contraction: 1, time: 1.3),
             WorkoutFixtures.frame(contraction: 0, time: 1.4)
+        ]
+
+        #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
+    }
+
+    @Test func countsConsecutiveCyclesWithoutWaitingBetweenReps() {
+        var engine = WorkoutRecognitionEngine()
+        let frames = [
+            WorkoutFixtures.frame(angle: 160, time: 1.0),
+            WorkoutFixtures.frame(angle: 30, time: 1.2),
+            WorkoutFixtures.frame(angle: 160, time: 1.4),
+            WorkoutFixtures.frame(angle: 30, time: 1.6),
+            WorkoutFixtures.frame(angle: 160, time: 1.8)
+        ]
+
+        #expect(frames.flatMap { engine.consume($0).reps }.count == 2)
+    }
+
+    @Test func heldRecoveryAngleDoesNotCreateAdditionalReps() {
+        var engine = WorkoutRecognitionEngine()
+        let frames = [
+            WorkoutFixtures.frame(angle: 160, time: 1.0),
+            WorkoutFixtures.frame(angle: 30, time: 1.2),
+            WorkoutFixtures.frame(angle: 160, time: 1.4),
+            WorkoutFixtures.frame(angle: 160, time: 1.8),
+            WorkoutFixtures.frame(angle: 160, time: 2.2)
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)

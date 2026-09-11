@@ -51,12 +51,11 @@ nonisolated enum RecognitionParameters {
     static let minimumConfidence: Float = 0.3
     static let targetFPS = 30.0
     static let maximumFrameGap = 0.5
-    static let smoothingTime = 0.10
     static let minimumCycleDuration = 0.30
     static let maximumCycleDuration = 8.0
-    static let maximumContractedAngle: Float = 100
+    static let maximumContractedAngle: Float = 90
     static let minimumRecoveryAngle: Float = 130
-    static let jointMinimumCutoff: Float = 1.0
+    static let jointMinimumCutoff: Float = 2.0  // Hz ; the minimum cutoff frequency for the One Euro filter. One Euro Filter is a low-pass filter that adapts its cutoff frequency based on the speed of the input signal. A higher cutoff frequency allows for faster response to changes in the input signal, while a lower cutoff frequency provides more smoothing and stability. The jointMinimumCutoff parameter sets the minimum cutoff frequency for the One Euro filter applied to joint positions, ensuring that even when joints are moving slowly, there is still some responsiveness in the filtering process.
     static let jointSpeedCoefficient: Float = 0.05
     static let jointDerivativeCutoff: Float = 1.0
     static let jointHoldDuration = 0.20
