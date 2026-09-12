@@ -1,0 +1,110 @@
+name: Pipeline
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  PROJECT: pushapp-blocker.xcodeproj
+  SCHEME: pushapp-blocker
+  DESTINATION: platform=iOS Simulator,OS=26.5,name=iPhone 17
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app
+        run: |
+          xcodebuild build \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "${DESTINATION}" \
+            CODE_SIGNING_ALLOWED=NO
+
+  lint:
+    name: Lint
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint
+        run: |
+          if ! command -v swiftlint >/dev/null 2>&1; then
+            brew install swiftlint
+          fi
+      - name: Run SwiftLint
+        run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
+
+  unit-tests:
+    name: Unit tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unit tests with coverage
+        run: |
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "${DESTINATION}" \
+            -parallel-testing-enabled NO \
+            -only-testing:pushapp-blockerTests \
+            -enableCodeCoverage YES \
+            -resultBundlePath "$RUNNER_TEMP/UnitTests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Save unit-test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: ${{ runner.temp }}/UnitTests.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
+
+  other-tests:
+    name: UI tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run UI tests
+        run: |
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "${DESTINATION}" \
+            -parallel-testing-enabled NO \
+            -only-testing:pushapp-blockerUITests \
+            CODE_SIGNING_ALLOWED=NO
+
+  coverage:
+    name: Code coverage
+    needs: unit-tests
+    if: needs.unit-tests.result == 'success'
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - name: Download unit-test results
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-test-results
+          path: ${{ runner.temp }}/unit-test-results
+      - name: Report coverage
+        run: |
+          {
+            echo '## Code coverage'
+            echo '```'
+            xcrun xccov view --report "$RUNNER_TEMP/unit-test-results/UnitTests.xcresult"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

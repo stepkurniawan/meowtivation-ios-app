@@ -42,14 +42,14 @@ nonisolated private struct CycleDetector {
 
         switch phase {
         case .waiting:
-            guard angle >= PushUpRecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters.minimumRecoveryAngle else { return false }
             phase = .extended
             startedAt = time
         case .extended:
-            guard angle <= PushUpRecognitionParameters.maximumContractedAngle else { return false }
+            guard angle <= PushUpRecognitionParameters.maximumContractedAngle + PushUpRecognitionParameters.angleTolerance else { return false }
             phase = .contracted
         case .contracted:
-            guard angle >= PushUpRecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters.minimumRecoveryAngle else { return false }
             let duration = time - startedAt
             let valid = duration >= PushUpRecognitionParameters.minimumCycleDuration &&
                 duration <= PushUpRecognitionParameters.maximumCycleDuration
@@ -157,7 +157,9 @@ nonisolated struct PushUpRecognitionEngine {
 
     private mutating func calibrate(_ candidates: [PushUpSample],
                                     at timestamp: TimeInterval) -> PushUpRecognitionUpdate {
-        let extended = candidates.filter { $0.angle >= PushUpRecognitionParameters.minimumRecoveryAngle }
+        let extended = candidates.filter {
+            $0.angle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters.minimumRecoveryAngle
+        }
         let visibleSides = Set(extended.map(\.side))
         for side in Array(calibrations.keys) where !visibleSides.contains(side) {
             calibrations.removeValue(forKey: side)

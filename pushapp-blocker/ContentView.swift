@@ -114,7 +114,7 @@ struct ContentView: View {
                 Text(commandError ?? "Unable to change restrictions.")
             }
             .fullScreenCover(isPresented: $isCameraOpen) {
-                PushUpView()
+                WorkoutView()
             }
         }
     }

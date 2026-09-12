@@ -5,16 +5,21 @@ import Testing
 
 nonisolated enum SquatFixtures {
     static func frame(angle: Float, time: Double, visibleSide: Int? = nil) -> PoseFrame {
-        let radians = angle * .pi / 180
+        frame(angles: [angle, angle], time: time, visibleSide: visibleSide)
+    }
+
+    static func frame(angles: [Float], time: Double, visibleSide: Int? = nil) -> PoseFrame {
+        precondition(angles.count == Squat.legChains.count)
         let knee: SIMD2<Float> = [0.5, 0.5]
-        let hip = knee + SIMD2<Float>(-0.3, 0)
-        let ankleRadians = .pi - radians
-        let ankle = knee + SIMD2<Float>(0.3 * cos(ankleRadians),
-                                        0.3 * sin(ankleRadians))
 
         var joints: [BodyJoint: PoseJoint] = [:]
         for (sideIndex, leg) in Squat.legChains.enumerated() {
             guard visibleSide == nil || visibleSide == sideIndex else { continue }
+            let radians = angles[sideIndex] * .pi / 180
+            let hip = knee + SIMD2<Float>(-0.3, 0)
+            let ankleRadians = .pi - radians
+            let ankle = knee + SIMD2<Float>(0.3 * cos(ankleRadians),
+                                            0.3 * sin(ankleRadians))
             let offset = SIMD2<Float>(0, Float(sideIndex) * 0.1)
             let positions = [hip, knee, ankle].map { $0 + offset }
             for (index, joint) in leg.enumerated() {
@@ -27,13 +32,13 @@ nonisolated enum SquatFixtures {
         return PoseFrame(timestamp: time, joints: joints)
     }
 
-    static func calibrationFrames(visibleSide: Int) -> [PoseFrame] {
+    static func calibrationFrames(visibleSide: Int? = nil) -> [PoseFrame] {
         stride(from: 0.0, through: SquatRecognitionParameters.calibrationDuration, by: 0.1).map {
             frame(angle: 170, time: $0, visibleSide: visibleSide)
         }
     }
 
-    static func trackingEngine(visibleSide: Int) -> SquatRecognitionEngine {
+    static func trackingEngine(visibleSide: Int? = nil) -> SquatRecognitionEngine {
         var engine = SquatRecognitionEngine()
         for frame in calibrationFrames(visibleSide: visibleSide) {
             _ = engine.consume(frame)
@@ -72,6 +77,28 @@ struct SquatRecognitionTests {
         let updates = frames.map { engine.consume($0) }
 
         #expect(updates.last?.reps.count == 1)
+    }
+
+    @Test func staggeredLegRecoveryCountsOneSquatAndAllowsLaterRep() {
+        var engine = SquatFixtures.trackingEngine()
+
+        let frames = [
+            SquatFixtures.frame(angles: [170, 170], time: 1.1),
+            SquatFixtures.frame(angles: [90, 90], time: 1.3),
+            SquatFixtures.frame(angles: [170, 90], time: 1.5),
+            SquatFixtures.frame(angles: [170, 170], time: 1.9),
+            SquatFixtures.frame(angles: [170, 170], time: 2.0),
+            SquatFixtures.frame(angles: [90, 90], time: 2.1),
+            SquatFixtures.frame(angles: [170, 170], time: 2.4)
+        ]
+
+        let updates = frames.map { engine.consume($0) }
+        let reps = updates.flatMap(\.reps)
+
+        #expect(reps.count == 2)
+        #expect(updates[2].reps.count == 1)
+        #expect(updates[3].reps.isEmpty)
+        #expect(updates[6].reps.count == 1)
     }
 
 }

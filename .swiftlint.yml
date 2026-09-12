@@ -1,0 +1,47 @@
+# SwiftLint configuration for the iOS targets in this repository.
+excluded:
+  - .build
+  - DerivedData
+  - "**/Generated"
+
+opt_in_rules:
+  - force_unwrapping
+  - force_try
+  - empty_count
+
+disabled_rules: []
+
+custom_rules:
+  hardcoded_secret_literal:
+    name: "Hardcoded secret"
+    message: "Secrets don't belong in source; use Keychain or build-time configuration."
+    regex: '(?i)\b(apiKey|api_key|apiToken|api_token|authToken|auth_token|clientSecret|client_secret|bearerToken|accessToken|privateKey|password)\b\s*[:=]\s*"[A-Za-z0-9+/_.\-]{12,}"'
+    severity: error
+    excluded: ".*(Tests|Mocks|Fixtures|Previews?)/.*"
+
+  print_in_production:
+    name: "print() in production code"
+    message: "Use os.Logger in production code."
+    regex: '^\s*print\('
+    severity: warning
+    excluded: ".*(Tests|UITests|Previews?|Playgrounds)/.*"
+
+  observable_object_legacy:
+    name: "ObservableObject (pre-@Observable)"
+    message: "Use @Observable with @State for iOS 17 and later targets."
+    regex: 'class\s+\w+\s*:\s*(\w+\s*,\s*)*ObservableObject'
+    severity: warning
+
+  xctest_in_unit_tests:
+    name: "XCTest in unit tests"
+    message: "Use Swift Testing in unit-test targets; XCTest remains valid for UI tests."
+    regex: '^import XCTest$'
+    included: ".*Tests/.*"
+    excluded: ".*UITests?/.*"
+    severity: warning
+
+  unchecked_sendable:
+    name: "@unchecked Sendable"
+    message: "Justify @unchecked Sendable or make the type actually Sendable."
+    regex: '@unchecked Sendable(?![^\n]*//)'
+    severity: warning

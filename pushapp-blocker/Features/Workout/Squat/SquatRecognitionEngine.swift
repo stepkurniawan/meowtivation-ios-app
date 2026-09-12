@@ -32,14 +32,14 @@ nonisolated private struct SquatCycleDetector {
 
         switch phase {
         case .waiting:
-            guard angle >= SquatRecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle else { return false }
             phase = .extended
             startedAt = time
         case .extended:
-            guard angle <= SquatRecognitionParameters.maximumContractedAngle else { return false }
+            guard angle <= SquatRecognitionParameters.maximumContractedAngle + SquatRecognitionParameters.angleTolerance else { return false }
             phase = .contracted
         case .contracted:
-            guard angle >= SquatRecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle else { return false }
             let duration = time - startedAt
             let valid = duration >= SquatRecognitionParameters.minimumCycleDuration &&
                 duration <= SquatRecognitionParameters.maximumCycleDuration
@@ -114,10 +114,10 @@ nonisolated struct SquatRecognitionEngine {
         }
 
         var reps: [SquatRepEvent] = []
-        let samplesBySide = Dictionary(uniqueKeysWithValues: candidates.map { ($0.side, $0) })
-        for side in Squat.legChains.indices {
-            guard let sample = samplesBySide[side] else {
-                let lostAt = legLostAt[side] ?? frame.timestamp
+        let samplesBySide: [Int : SquatSample] = Dictionary(uniqueKeysWithValues: candidates.map { ($0.side, $0) })
+        for side: Range<Array<[BodyJoint]>.Index>.Element in Squat.legChains.indices {
+            guard let sample: SquatSample = samplesBySide[side] else {
+                let lostAt: TimeInterval = legLostAt[side] ?? frame.timestamp
                 legLostAt[side] = lostAt
                 if frame.timestamp - lostAt > SquatRecognitionParameters.legDropoutGraceDuration {
                     detectors.removeValue(forKey: side)
@@ -149,7 +149,7 @@ nonisolated struct SquatRecognitionEngine {
     private mutating func calibrate(_ candidates: [SquatSample],
                                     at timestamp: TimeInterval) -> SquatRecognitionUpdate {
         let extended = candidates.filter {
-            $0.angle >= SquatRecognitionParameters.minimumRecoveryAngle
+            $0.angle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle
         }
         let visibleSides = Set(extended.map(\.side))
         for side in Array(calibrations.keys) where !visibleSides.contains(side) {

@@ -1,19 +1,31 @@
 import SwiftUI
 import UIKit
 
-struct PushUpView: View {
+struct WorkoutView: View {
     private enum TapSide {
         case left, right
     }
 
     private static let developerSequence: [TapSide] = [.left, .right, .left, .right, .left, .right]
 
-    @StateObject private var model = PushUpSessionModel()
+    @StateObject private var model = WorkoutSessionModel()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var developerMode = false
     @State private var developerTapProgress: [TapSide] = []
     @State private var lastDeveloperTap: TimeInterval?
+
+    private var activeTitle: String {
+        model.selectedExercise?.title ?? model.suggestedExercise?.title ?? "Push-up or Squat"
+    }
+
+    private var activePlacement: String {
+        model.selectedExercise?.placement ?? "Keep one person in view. Try either a side-view push-up or a full-body squat."
+    }
+
+    private var activeConfiguration: WorkoutPoseConfiguration {
+        model.selectedExercise?.poseConfiguration ?? .automatic
+    }
 
     /// The main view for the workout session. It displays different content based on the state of the workout session (not started, in progress, or ended).
     var body: some View {
@@ -85,10 +97,10 @@ struct PushUpView: View {
                 Text("Set up your phone").font(.title.bold())
                 Text("Lean your phone securely against a wall with the screen facing you. Keep one person in view with one shoulder, elbow, and wrist visible. Rotate the phone if you need a wider view.")
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(PushUp.title).font(.headline)
-                    Text(PushUp.placement)
+                    Text("Push-up or Squat").font(.headline)
+                    Text("For a push-up, keep one shoulder, elbow, wrist, and preferably your hip visible from the side. For a squat, keep one shoulder, hip, knee, and ankle visible.")
                 }
-                Text("Start with your arms extended. One rep is counted when your elbow angle gets smaller and then returns to the extended position.")
+                Text("The starting pose is only a suggestion. Begin either exercise directly; the first complete rep selects it and counts as rep 1.")
                 Text("Video stays on your phone and is not saved. This session counts reps; it does not unlock blocked apps.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Button("Start Counting") { model.start() }
@@ -121,7 +133,7 @@ struct PushUpView: View {
     /// A view that displays the live camera preview with the detected skeleton overlay and error messages.
     private var preview: some View {
         WorkoutPreview(session: model.camera.session, frame: model.latestFrame,
-                       configuration: PushUp.poseConfiguration,
+                       configuration: activeConfiguration,
                        onRotation: model.updateRotation)
             .background(.black)
             .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -143,33 +155,40 @@ struct PushUpView: View {
             .accessibilityLabel("Live front camera preview")
     }
 
-    /// A view that displays the push-up count, readiness, tracking messages, and optional diagnostics.
+    /// A view that displays the workout count, readiness, tracking messages, and optional diagnostics.
     private var controls: some View {
         VStack(spacing: 12) {
-            Text(PushUp.title).font(.title2.bold())
-            Text("\(model.pushUpCount)").font(.system(size: 64, weight: .bold, design: .rounded))
-                .monospacedDigit().accessibilityLabel("\(model.pushUpCount) repetitions")
+            Text(activeTitle).font(.title2.bold())
+            Text("\(model.repCount)").font(.system(size: 64, weight: .bold, design: .rounded))
+                .monospacedDigit().accessibilityLabel("\(model.repCount) repetitions")
             Image(systemName: model.poseReady ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .font(.title2)
                 .foregroundStyle(model.poseReady ? .green : .red)
                 .accessibilityLabel(model.poseReady ? "Pose ready" : "Pose not ready")
             Text(model.tracking.message).font(.callout).multilineTextAlignment(.center)
+            if let suggestion = model.suggestedExercise, model.selectedExercise == nil {
+                Text("Suggested: \(suggestion.title). Start moving when you are ready.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             if model.startCueVisible {
                 Text("Start!").font(.title.bold()).foregroundStyle(.green)
-                    .accessibilityLabel("Start push-ups")
+                    .accessibilityLabel("Start \(activeTitle)")
             }
-            if model.tracking == .findingPosition || model.tracking == .waitingForArm {
-                Text(PushUp.placement).font(.caption).foregroundStyle(.secondary)
+            if model.tracking == .findingPosition || model.tracking == .waitingForJoints {
+                Text(activePlacement).font(.caption).foregroundStyle(.secondary)
             }
-            pushUpCountCard
+            countCard
             if developerMode {
                 Text(String(format: "%.1f fps · %.0f ms · %d usable joints", model.analysisFPS,
                             model.processingMilliseconds, model.latestFrame?.joints.values.filter(\.isUsable).count ?? 0))
                     .font(.caption.monospaced())
-                if !model.armAngles.isEmpty {
+                if !model.armAngles.isEmpty || !model.kneeAngles.isEmpty {
                     Text(model.armAngles.keys.sorted().map {
                         "\($0 == 0 ? "Right" : "Left"): \(Int(model.armAngles[$0]!))°"
-                    }.joined(separator: " · ")).font(.caption.monospaced())
+                    }.joined(separator: " · ") +
+                    (model.kneeAngles.isEmpty ? "" : "  knees: " + model.kneeAngles.keys.sorted().map {
+                        "\($0 == 0 ? "Right" : "Left"): \(Int(model.kneeAngles[$0]!))°"
+                    }.joined(separator: " · "))).font(.caption.monospaced())
                 }
                 Text("Green: corroborated joint. Orange: rejected. A returned joint does not prove visibility.")
                     .font(.caption2)
@@ -195,25 +214,28 @@ struct PushUpView: View {
         }
     }
 
-    /// A view that displays the push-up count.
-    private var pushUpCountCard: some View {
+    /// A view that displays the workout count.
+    private var countCard: some View {
         VStack {
-            Text("\(model.pushUpCount)").font(.title3.bold()).monospacedDigit()
-            Text(PushUp.title).font(.caption)
+            Text("\(model.repCount)").font(.title3.bold()).monospacedDigit()
+            Text(activeTitle).font(.caption)
         }
         .frame(maxWidth: .infinity)
         .padding()
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// A view that displays a summary of the workout session, including an icon, completion message, push-up count, and a "Done" button to dismiss the view.
+    /// A view that displays a summary of the workout session, including an icon, completion message, workout count, and a "Done" button to dismiss the view.
     private var summary: some View {
         VStack(spacing: 24) {
             Image(systemName: "figure.strengthtraining.traditional").font(.system(size: 60))
             Text("Session complete").font(.title.bold())
-            pushUpCountCard
+            countCard
             Text("Your next session starts at zero.").foregroundStyle(.secondary)
             Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
         }.padding()
     }
 }
+
+/// Compatibility for callers that still present the old push-up view name.
+typealias PushUpView = WorkoutView

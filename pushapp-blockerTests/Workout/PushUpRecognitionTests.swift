@@ -437,9 +437,13 @@ nonisolated private final class TestWorkoutCamera: WorkoutCameraControlling {
     let session = AVCaptureSession()
     var generation = 0
     var stops = 0
+    var poseConfigurationUpdates = 0
     func start(generation: Int, rotation: Double) { self.generation = generation }
     func stop() { stops += 1 }
     func updateRotation(_ angle: Double) { }
+    func updatePoseConfiguration(_ configuration: WorkoutPoseConfiguration) {
+        poseConfigurationUpdates += 1
+    }
 }
 
 @MainActor struct PushUpSessionTests {
@@ -477,6 +481,7 @@ nonisolated private final class TestWorkoutCamera: WorkoutCameraControlling {
             model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
         }
         #expect(model.pushUpCount == 3)
+        #expect(camera.poseConfigurationUpdates == 1)
 
         model.receive(.state(.interrupted), generation: camera.generation)
         let pushUpCount = model.pushUpCount

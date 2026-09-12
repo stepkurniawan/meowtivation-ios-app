@@ -7,8 +7,10 @@ nonisolated enum SquatRecognitionParameters {
     static let maximumCycleDuration = 8.0
     static let maximumContractedAngle: Float = 100
     static let minimumRecoveryAngle: Float = 160
+    static let angleTolerance: Float = 0.1
+    static let motionAngle: Float = 145
     static let legDropoutGraceDuration = 0.25
-    static let legRepDeduplicationDuration = 0.30
+    static let legRepDeduplicationDuration = 0.75
     static let calibrationDuration = 1.0
     static let calibrationJitter: Float = 0.025
 }

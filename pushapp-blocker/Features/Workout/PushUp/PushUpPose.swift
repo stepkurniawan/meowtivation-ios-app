@@ -7,6 +7,7 @@ nonisolated enum PushUpRecognitionParameters {
     static let maximumCycleDuration = 8.0
     static let maximumContractedAngle: Float = 90
     static let minimumRecoveryAngle: Float = 130
+    static let angleTolerance: Float = 0.1
     static let armDropoutGraceDuration = 0.25
     static let armRepDeduplicationDuration = 0.30
     static let calibrationDuration = 1.0

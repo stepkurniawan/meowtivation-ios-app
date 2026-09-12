@@ -5,29 +5,39 @@ The app is in swift language using SwiftUI and SwiftData when possible.
 
 ## Workout recognition
 
-**Start Workout** opens a live, on-device camera session that recognizes and counts
-push-ups. It uses Vision's `VNDetectHumanBodyPoseRequest`, then counts a rep when
-the 2D elbow angle decreases and returns to the extended position.
+**Start Workout** opens a live, on-device camera session that suggests and counts
+push-ups or squats. It uses Vision's `VNDetectHumanBodyPoseRequest` to extract both
+arm and leg joints. The starting pose is only a hint: the first complete elbow or
+knee-angle rep selects the exercise, becomes rep 1, and locks that exercise for the
+session.
 
 The app intentionally uses 2D pose observations rather than 3D observations:
 push-up counting only needs the shoulder-elbow-wrist geometry in the camera image,
 and the 2D pipeline better supports the intended side-view setup where the rest of
 the body may be cropped out.
 
-The phone should lean securely against a wall with one person in frame. Use a
-side view with one shoulder, elbow, and wrist visible; the rest of the body can
-be cropped. The green/red readiness icon shows whether the required arm chain is
-currently visible. The debug build includes a tracking overlay with angles, frame
-rate, and Vision processing time.
+The phone should lean securely against a wall with one person in frame. For a
+push-up, use a side view with one shoulder, elbow, and wrist visible; the legs can
+be cropped after the first pose suggestion. For a squat, move far enough back to
+keep one shoulder, hip, knee, and ankle visible. The starting hint uses horizontal
+torso plus extended-arm geometry for push-ups and vertical torso plus extended-leg
+geometry for squats. The readiness icon reports whether the current required joints
+are usable. The debug build includes a tracking overlay with arm and knee angles,
+frame rate, and Vision processing time.
 
-Video is processed locally and is not saved. Spoken push-up count
+The starting hint is deterministic landmark geometry rather than a bundled exercise
+AI model. A future Core ML classifier can advise the same session boundary, but the
+completed rep remains the source of truth for locking the workout.
+
+Video is processed locally and is not saved. Spoken workout count
 feedback can be muted. The current feature counts a workout session but does not
 complete or unlock the daily app-blocking requirement.
 
 The iOS Simulator has no usable camera for Vision testing. Validate placements,
-lighting, phone angle, and different users on a physical iPhone. The recognition
-engine has deterministic tests for complete and partial reps, speed changes,
-tracking gaps, cropped bodies, and false-positive movements.
+lighting, phone angle, different users, and incorrect starting-pose hints on a
+physical iPhone. The recognition engines have deterministic tests for complete and
+partial reps, speed changes, tracking gaps, cropped bodies, and false-positive
+movements.
 
 ## Daily lock state
 
@@ -186,16 +196,21 @@ an Apple requirement.
 
 ### Workout feature
 
-The Workout feature keeps reusable camera and pose infrastructure at its root.
-Exercise-specific code lives in its own folder; currently that is PushUp.
+The Workout feature keeps reusable camera, pose, and automatic-selection
+infrastructure at its root. Exercise-specific code lives in its own folder.
 
 - [`PushUpView.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpView.swift)
-  displays setup instructions, the live camera preview, the push-up count,
-  tracking status, optional diagnostics, and the completed
-  session summary. It also pauses and resumes with the app's scene phase.
+  contains the shared `WorkoutView`, which displays setup guidance, the live camera
+  preview, the suggested/selected exercise, the count, tracking status, diagnostics,
+  and the completed session summary. It pauses and resumes with scene phase.
 - [`PushUpSessionModel.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpSessionModel.swift)
-  coordinates the session lifecycle, push-up count, camera state, orientation, speech
-  feedback, and published view state.
+  contains the shared `WorkoutSessionModel`, which coordinates automatic selection,
+  session lifecycle, count, camera state, orientation, speech feedback, and published
+  view state.
+- [`WorkoutExercise.swift`](pushapp-blocker/Features/Workout/WorkoutExercise.swift)
+  defines exercise metadata, the union camera configuration, shared tracking updates,
+  the starting-pose hint, and the automatic coordinator that runs push-up and squat
+  engines in parallel until the first valid rep.
 - [`WorkoutCamera.swift`](pushapp-blocker/Features/Workout/WorkoutCamera.swift)
   owns camera permission, capture, Vision processing, interruptions, runtime
   errors, device rotation, and configured `PoseFrame` delivery.
@@ -209,15 +224,19 @@ Exercise-specific code lives in its own folder; currently that is PushUp.
 - [`PushUp.swift`](pushapp-blocker/Features/Workout/PushUp/PushUp.swift) and
   [`PushUpPose.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpPose.swift)
   define the push-up arm chains, camera target, pose samples, and thresholds.
+- [`Squat.swift`](pushapp-blocker/Features/Workout/Squat/Squat.swift) and
+  [`SquatPose.swift`](pushapp-blocker/Features/Workout/Squat/SquatPose.swift)
+  define the squat leg chains, camera target, pose samples, and thresholds.
 - [`PushUpRecognitionEngine.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpRecognitionEngine.swift)
   is the pure temporal push-up classifier. It uses stabilized elbow angles,
   detects a stable down-then-up cycle, and reports tracking status and
   repetitions.
 
 The view starts the session model, which starts the camera. The camera emits
-events and valid frames; the model passes frames to the recognition engine, then
-updates the push-up count and optionally triggers `WorkoutSpeech`. The recognition engine
-has no camera, Vision, speech, persistence, or blocking dependencies.
+events and union-configured pose frames; the model passes each frame to both pure
+recognition engines. The first unambiguous rep selects and locks the exercise,
+updates the shared count, narrows the camera/overlay configuration, and optionally
+triggers `WorkoutSpeech`. Recognition has no persistence or blocking dependencies.
 
 For changes, use the exercise view and session model for exercise-specific UI
 and lifecycle behavior, the camera for capture and Vision behavior, the root

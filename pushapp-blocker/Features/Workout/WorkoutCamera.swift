@@ -29,6 +29,11 @@ nonisolated protocol WorkoutCameraControlling: AnyObject {
     func start(generation: Int, rotation: Double)
     func stop()
     func updateRotation(_ angle: Double)
+    func updatePoseConfiguration(_ configuration: WorkoutPoseConfiguration)
+}
+
+nonisolated extension WorkoutCameraControlling {
+    func updatePoseConfiguration(_ configuration: WorkoutPoseConfiguration) { }
 }
 
 /// All mutable capture and Vision state is confined to queue. The preview only
@@ -39,7 +44,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     private let output = AVCaptureVideoDataOutput()
     private let motion = CMMotionManager()
     private let pose2D = VNDetectHumanBodyPoseRequest()
-    private let configuration: WorkoutPoseConfiguration
+    private var configuration: WorkoutPoseConfiguration
     private let onEvent: @Sendable (Int, WorkoutCameraEvent) -> Void
     private var observers: [NSObjectProtocol] = []
     private var device: AVCaptureDevice?
@@ -125,6 +130,14 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
         }
     }
 
+    func updatePoseConfiguration(_ configuration: WorkoutPoseConfiguration) {
+        queue.async { [self] in
+            self.configuration = configuration
+            poseStabilizer.reset()
+            didSetCameraTarget = false
+        }
+    }
+
     private func emit(_ event: WorkoutCameraEvent) { onEvent(generation, event) }
 
     private func configureAndStart() {
@@ -180,7 +193,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
         }
     }
 
-    /// Camera configuration stays here; choosing the target remains in PushUp.
+    /// Camera configuration stays here; the active exercise supplies its target.
     private func configureAutomaticFocusAndExposure(on device: AVCaptureDevice, at point: CGPoint) {
         do {
             try device.lockForConfiguration()
