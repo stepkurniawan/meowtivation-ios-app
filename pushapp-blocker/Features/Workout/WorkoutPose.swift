@@ -4,6 +4,22 @@ import simd
 nonisolated enum PushUp {
     static let title = "Push-up"
     static let placement = "Use a side view with one shoulder, elbow, and wrist visible. Your legs can be out of frame."
+
+    /// Returns one arm's image-space centre when Vision sees a reliable push-up arm.
+    /// This is intentionally push-up-specific; other workouts must define their own target.
+    static func cameraTarget(from joints: [BodyJoint: PoseJoint]) -> SIMD2<Float>? {
+        for arm in BodyJoint.sides {
+            guard let shoulder = joints[arm[0]], let elbow = joints[arm[1]], let wrist = joints[arm[2]],
+                  [shoulder, elbow, wrist].allSatisfy({
+                      $0.confidence2D >= 0.5 &&
+                      $0.imagePoint.x.isFinite && $0.imagePoint.y.isFinite &&
+                      (0.0...1.0).contains($0.imagePoint.x) &&
+                      (0.0...1.0).contains($0.imagePoint.y)
+                  }) else { continue }
+            return (shoulder.imagePoint + elbow.imagePoint + wrist.imagePoint) / 3
+        }
+        return nil
+    }
 }
 
 nonisolated enum BodyJoint: String, CaseIterable, Codable, Sendable {

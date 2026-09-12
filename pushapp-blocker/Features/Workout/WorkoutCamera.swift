@@ -41,6 +41,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     private let pose2D = VNDetectHumanBodyPoseRequest()
     private let onEvent: @Sendable (Int, WorkoutCameraEvent) -> Void
     private var observers: [NSObjectProtocol] = []
+    private var device: AVCaptureDevice?
     private var configured = false
     private var active = false
     private var generation = 0
@@ -49,6 +50,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     private var rotation = 90.0
     private var movingUntil = 0.0
     private var poseStabilizer = PoseStabilizer()
+    private var didSetPushUpCameraTarget = false
 
     init(onEvent: @escaping @Sendable (Int, WorkoutCameraEvent) -> Void) {
         self.onEvent = onEvent
@@ -80,6 +82,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             failures = 0
             lastAnalysis = -.infinity
             poseStabilizer.reset()
+            didSetPushUpCameraTarget = false
             switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized: configureAndStart()
             case .notDetermined:
@@ -111,6 +114,8 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             applyRotation()
             lastAnalysis = -.infinity
             poseStabilizer.reset()
+            didSetPushUpCameraTarget = false
+            if let device { configureAutomaticFocusAndExposure(on: device, at: CGPoint(x: 0.5, y: 0.5)) }
             movingUntil = ProcessInfo.processInfo.systemUptime + 0.75
             emit(.frame(PoseFrame(timestamp: ProcessInfo.processInfo.systemUptime, joints: [:],
                                   cameraIsMoving: true), milliseconds: 0))
@@ -126,6 +131,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                 guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
                     emit(.state(.unavailable)); return
                 }
+                self.device = device
                 let input = try AVCaptureDeviceInput(device: device)
                 session.beginConfiguration()
                 defer { session.commitConfiguration() }
@@ -142,6 +148,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                 configured = true
                 applyRotation()
             }
+            if let device { configureAutomaticFocusAndExposure(on: device, at: CGPoint(x: 0.5, y: 0.5)) }
             if motion.isDeviceMotionAvailable {
                 motion.deviceMotionUpdateInterval = 1.0 / 30
                 motion.startDeviceMotionUpdates()
@@ -167,6 +174,20 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             device.activeVideoMaxFrameDuration = frameDuration
         } catch {
             // Keep the camera's default frame rate when configuration is unavailable.
+        }
+    }
+
+    /// Camera configuration stays here; choosing the target remains in PushUp.
+    private func configureAutomaticFocusAndExposure(on device: AVCaptureDevice, at point: CGPoint) {
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            if device.isFocusPointOfInterestSupported { device.focusPointOfInterest = point }
+            if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+            if device.isExposurePointOfInterestSupported { device.exposurePointOfInterest = point }
+            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+        } catch {
+            // Preserve the device's default automatic behavior when it cannot be configured.
         }
     }
 
@@ -222,6 +243,12 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                                                   imagePoint: observed,
                                                   confidence2D: point2D.confidence)
                 }
+            }
+            if !didSetPushUpCameraTarget, let target = PushUp.cameraTarget(from: rawJoints), let device {
+                // Vision image points start at the lower left; AVCapture points start at the upper left.
+                configureAutomaticFocusAndExposure(on: device,
+                                                    at: CGPoint(x: CGFloat(target.x), y: CGFloat(1 - target.y)))
+                didSetPushUpCameraTarget = true
             }
             let joints = poseStabilizer.stabilize(rawJoints, at: now)
             failures = 0

@@ -96,6 +96,32 @@ nonisolated enum WorkoutFixtures {
 }
 
 struct WorkoutRecognitionTests {
+    @Test func pushUpCameraTargetUsesTheCentreOfOneReliableArm() {
+        var frame = WorkoutFixtures.frame(contraction: 0, time: 1)
+        for joint in BodyJoint.sides[1] { frame.joints[joint] = nil }
+
+        let target = PushUp.cameraTarget(from: frame.joints)
+        let arm = BodyJoint.sides[0]
+        let expected = (frame.joints[arm[0]]!.imagePoint + frame.joints[arm[1]]!.imagePoint +
+                        frame.joints[arm[2]]!.imagePoint) / 3
+
+        #expect(target == expected)
+    }
+
+    @Test func pushUpCameraTargetRejectsIncompleteOrLowConfidenceArms() {
+        var frame = WorkoutFixtures.frame(contraction: 0, time: 1)
+        for arm in BodyJoint.sides {
+            frame.joints[arm[2]] = nil
+        }
+        #expect(PushUp.cameraTarget(from: frame.joints) == nil)
+
+        frame = WorkoutFixtures.frame(contraction: 0, time: 1)
+        for arm in BodyJoint.sides {
+            for joint in arm { frame.joints[joint]?.confidence2D = 0.49 }
+        }
+        #expect(PushUp.cameraTarget(from: frame.joints) == nil)
+    }
+
     @Test func countsOnlyAStableAngleDownThenUpCycle() {
         var engine = WorkoutFixtures.trackingEngine()
         let events = WorkoutFixtures.sequence().flatMap { engine.consume($0).reps }
