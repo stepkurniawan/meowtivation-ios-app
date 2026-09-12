@@ -395,6 +395,19 @@ struct WorkoutRecognitionTests {
         #expect(update.selectedSide == 1)
     }
 
+    @Test func choosesLongerArmOverHigherConfidenceDuringCalibration() {
+        var engine = WorkoutRecognitionEngine()
+        var update = PushUpRecognitionUpdate(tracking: .findingPosition)
+        for time in stride(from: 0.0, through: 1.0, by: 0.1) {
+            var frame = WorkoutFixtures.frame(angle: 160, time: time)
+            frame = WorkoutFixtures.withConfidence(frame, side: 0, confidence: 0.99)
+            frame = WorkoutFixtures.withScaledArm(frame, side: 1, scale: 1.15)
+            update = engine.consume(frame)
+        }
+        #expect(update.didStart)
+        #expect(update.selectedSide == 1)
+    }
+
     @Test func unresolvedCalibrationTieKeepsWaiting() {
         var engine = WorkoutRecognitionEngine()
         var update = PushUpRecognitionUpdate(tracking: .findingPosition)

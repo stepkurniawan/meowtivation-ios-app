@@ -191,6 +191,10 @@ nonisolated struct WorkoutRecognitionEngine {
                                        selectedSide: side, didStart: true)
     }
 
+    /// Chooses a side only after its stable, extended calibration has lasted one second.
+    /// When both sides qualify, prefer the longer average projected arm chain because it is
+    /// more likely to face the camera and remain visible. Use average joint confidence only
+    /// when projected lengths are effectively tied; if both measures tie, keep calibrating.
     private func selectedCalibrationSide(at timestamp: TimeInterval) -> Int? {
         let completed = calibrations.filter {
             timestamp - $0.value.startedAt >= RecognitionParameters.calibrationDuration
@@ -199,13 +203,13 @@ nonisolated struct WorkoutRecognitionEngine {
         guard completed.count > 1 else { return completed.keys.first }
         let ordered = completed.sorted { $0.key < $1.key }
         guard let first = ordered.first, let second = ordered.dropFirst().first else { return nil }
-        let confidenceDifference = first.value.averageConfidence - second.value.averageConfidence
-        if abs(confidenceDifference) > RecognitionParameters.confidenceTieTolerance {
-            return confidenceDifference > 0 ? first.key : second.key
-        }
         let lengthDifference = first.value.averageArmLength - second.value.averageArmLength
         if abs(lengthDifference) > RecognitionParameters.armLengthTieTolerance {
             return lengthDifference > 0 ? first.key : second.key
+        }
+        let confidenceDifference = first.value.averageConfidence - second.value.averageConfidence
+        if abs(confidenceDifference) > RecognitionParameters.confidenceTieTolerance {
+            return confidenceDifference > 0 ? first.key : second.key
         }
         return nil
     }

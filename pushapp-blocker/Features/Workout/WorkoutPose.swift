@@ -3,7 +3,7 @@ import simd
 
 nonisolated enum PushUp {
     static let title = "Push-up"
-    static let placement = "Use a side view with one shoulder, elbow, and wrist visible. Your legs can be out of frame."
+    static let placement = "Looking at the floor is fine. Keep the side of your head, upper body, and one shoulder, elbow, and wrist visible. Your legs can be out of frame."
 
     /// Returns one arm's image-space centre when Vision sees a reliable push-up arm.
     /// This is intentionally push-up-specific; other workouts must define their own target.
