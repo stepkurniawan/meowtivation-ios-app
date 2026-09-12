@@ -95,12 +95,12 @@ struct WorkoutView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Set up your phone").font(.title.bold())
-                Text("Lean your phone securely against a wall with the screen facing you. Keep one person in view with one shoulder, elbow, and wrist visible. Rotate the phone if you need a wider view.")
+                Text("Lean your phone securely against a wall with the screen facing you. Keep one person in view. Rotate the phone if you need a wider view.")
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Push-up or Squat").font(.headline)
-                    Text("For a push-up, keep one shoulder, elbow, wrist, and preferably your hip visible from the side. For a squat, keep one shoulder, hip, knee, and ankle visible.")
+                    Text("For a push-up, keep one shoulder, elbow, wrist, and preferably your hip visible from the side. For a squat, keep one shoulder, hip, knee, and ankle visible. Your arms can be bent.")
                 }
-                Text("The starting pose is only a suggestion. Begin either exercise directly; the first complete rep selects it and counts as rep 1.")
+                Text("Hold your starting position still until Start! appears, then begin. The first complete rep selects the exercise and counts as rep 1.")
                 Text("Video stays on your phone and is not saved. This session counts reps; it does not unlock blocked apps.")
                     .font(.footnote).foregroundStyle(.secondary)
                 Button("Start Counting") { model.start() }

@@ -3,7 +3,7 @@ import Foundation
 /// The body chains used by the first squat recognizer.
 nonisolated enum Squat {
     static let title = "Squat"
-    static let placement = "Stand far enough from the phone to keep one shoulder, hip, knee, and ankle visible. Keep your torso upright and start with your knees extended."
+    static let placement = "Stand far enough from the phone to keep one shoulder, hip, knee, and ankle visible. Keep your torso upright and start with your knees extended. Your arms can be bent."
 
     static let legChains: [[BodyJoint]] = [
         [.rightHip, .rightKnee, .rightAnkle],
