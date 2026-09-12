@@ -2,7 +2,7 @@ import Foundation
 import simd
 
 nonisolated enum WorkoutTracking: Equatable, Sendable {
-    case findingPosition, validatingPosition, ready, tracking, waitingForSelectedArm, cameraMoving
+    case findingPosition, validatingPosition, ready, tracking, waitingForArm, cameraMoving
 
     var message: String {
         switch self {
@@ -10,7 +10,7 @@ nonisolated enum WorkoutTracking: Equatable, Sendable {
         case .validatingPosition: "Hold still. Checking your position."
         case .ready: "Start!"
         case .tracking: "Tracking your push-ups"
-        case .waitingForSelectedArm: "Keep your selected shoulder, elbow, and wrist visible."
+        case .waitingForArm: "Keep a shoulder, elbow, and wrist visible."
         case .cameraMoving: "Keep the phone still against the wall."
         }
     }
@@ -24,8 +24,7 @@ nonisolated struct PushUpRepEvent: Identifiable, Sendable {
 nonisolated struct PushUpRecognitionUpdate: Sendable {
     var tracking: WorkoutTracking
     var poseReady = false
-    var pushUpAngle: Float?
-    var selectedSide: Int?
+    var armAngles: [Int: Float] = [:]
     var didStart = false
     var reps: [PushUpRepEvent] = []
 }
@@ -67,46 +66,33 @@ nonisolated struct WorkoutRecognitionEngine {
     private struct CalibrationMeasurement {
         let startedAt: TimeInterval
         let referencePoints: [SIMD2<Float>]
-        var confidenceTotal: Float
-        var armLengthTotal: Float
-        var sampleCount: Int
 
         init(sample: PushUpSample, at timestamp: TimeInterval) {
             startedAt = timestamp
             referencePoints = sample.points
-            confidenceTotal = sample.confidence
-            armLengthTotal = sample.armLength
-            sampleCount = 1
         }
-
-        var averageConfidence: Float { confidenceTotal / Float(sampleCount) }
-        var averageArmLength: Float { armLengthTotal / Float(sampleCount) }
 
         func isSteady(_ sample: PushUpSample) -> Bool {
             zip(referencePoints, sample.points).allSatisfy {
                 simd_distance($0, $1) <= RecognitionParameters.calibrationJitter
             }
         }
-
-        mutating func append(_ sample: PushUpSample) {
-            confidenceTotal += sample.confidence
-            armLengthTotal += sample.armLength
-            sampleCount += 1
-        }
     }
 
-    private var detector = CycleDetector()
+    private var detectors: [Int: CycleDetector] = [:]
     private var nextID: UInt64 = 0
     private var lastTimestamp: TimeInterval?
-    private var selectedSide: Int?
-    private var selectedArmLostAt: TimeInterval?
+    private var isTracking = false
+    private var armLostAt: [Int: TimeInterval] = [:]
+    private var lastRepAt: TimeInterval?
     private var calibrations: [Int: CalibrationMeasurement] = [:]
 
     mutating func resetTracking() {
-        detector = CycleDetector()
+        detectors = [:]
         lastTimestamp = nil
-        selectedSide = nil
-        selectedArmLostAt = nil
+        isTracking = false
+        armLostAt = [:]
+        lastRepAt = nil
         calibrations = [:]
         // Preserve the event sequence across resets to prevent duplicate credits.
     }
@@ -132,30 +118,41 @@ nonisolated struct WorkoutRecognitionEngine {
         }
 
         let candidates = PoseFeatures.pushUpSamples(from: frame)
-        if selectedSide == nil {
+        if !isTracking {
             return calibrate(candidates, at: frame.timestamp)
         }
 
-        guard let selectedSide,
-              let sample = candidates.first(where: { $0.side == selectedSide }) else {
-            let lostAt = selectedArmLostAt ?? frame.timestamp
-            selectedArmLostAt = lostAt
-            if frame.timestamp - lostAt > RecognitionParameters.selectedArmDropoutGraceDuration {
-                detector = CycleDetector()
+        var reps: [PushUpRepEvent] = []
+        let samplesBySide = Dictionary(uniqueKeysWithValues: candidates.map { ($0.side, $0) })
+        for side in BodyJoint.sides.indices {
+            guard let sample = samplesBySide[side] else {
+                let lostAt = armLostAt[side] ?? frame.timestamp
+                armLostAt[side] = lostAt
+                if frame.timestamp - lostAt > RecognitionParameters.armDropoutGraceDuration {
+                    detectors.removeValue(forKey: side)
+                }
+                continue
             }
-            return PushUpRecognitionUpdate(tracking: .waitingForSelectedArm,
-                                           selectedSide: selectedSide)
+
+            armLostAt.removeValue(forKey: side)
+            var detector = detectors[side] ?? CycleDetector()
+            let completed = detector.consume(sample, at: frame.timestamp)
+            detectors[side] = detector
+            guard completed,
+                  lastRepAt.map({ frame.timestamp - $0 >= RecognitionParameters.armRepDeduplicationDuration }) ?? true else {
+                continue
+            }
+            nextID += 1
+            lastRepAt = frame.timestamp
+            reps.append(PushUpRepEvent(id: nextID, timestamp: frame.timestamp))
         }
 
-        selectedArmLostAt = nil
-        let completed = detector.consume(sample, at: frame.timestamp)
-        var reps: [PushUpRepEvent] = []
-        if completed {
-            nextID += 1
-            reps = [PushUpRepEvent(id: nextID, timestamp: frame.timestamp)]
+        let armAngles = Dictionary(uniqueKeysWithValues: candidates.map { ($0.side, $0.angle) })
+        guard !candidates.isEmpty else {
+            return PushUpRecognitionUpdate(tracking: .waitingForArm)
         }
         return PushUpRecognitionUpdate(tracking: .tracking, poseReady: true,
-                                       pushUpAngle: sample.angle, selectedSide: selectedSide, reps: reps)
+                                       armAngles: armAngles, reps: reps)
     }
 
     private mutating func calibrate(_ candidates: [PushUpSample],
@@ -166,11 +163,8 @@ nonisolated struct WorkoutRecognitionEngine {
             calibrations.removeValue(forKey: side)
         }
         for sample in extended {
-            if var measurement = calibrations[sample.side] {
-                if measurement.isSteady(sample) {
-                    measurement.append(sample)
-                    calibrations[sample.side] = measurement
-                } else {
+            if let measurement = calibrations[sample.side] {
+                if !measurement.isSteady(sample) {
                     calibrations.removeValue(forKey: sample.side)
                 }
             } else {
@@ -179,38 +173,28 @@ nonisolated struct WorkoutRecognitionEngine {
         }
 
         guard !calibrations.isEmpty else {
-            return PushUpRecognitionUpdate(tracking: .findingPosition)
+            return PushUpRecognitionUpdate(tracking: .findingPosition,
+                                           armAngles: angles(from: candidates))
         }
-        guard let side = selectedCalibrationSide(at: timestamp) else {
-            return PushUpRecognitionUpdate(tracking: .validatingPosition)
+        guard calibrations.values.contains(where: {
+            timestamp - $0.startedAt >= RecognitionParameters.calibrationDuration
+        }) else {
+            return PushUpRecognitionUpdate(tracking: .validatingPosition,
+                                           armAngles: angles(from: candidates))
         }
-        selectedSide = side
+        isTracking = true
         calibrations = [:]
-        detector = CycleDetector()
+        detectors = [:]
+        for sample in candidates {
+            var detector = CycleDetector()
+            _ = detector.consume(sample, at: timestamp)
+            detectors[sample.side] = detector
+        }
         return PushUpRecognitionUpdate(tracking: .ready, poseReady: true,
-                                       selectedSide: side, didStart: true)
+                                       armAngles: angles(from: candidates), didStart: true)
     }
 
-    /// Chooses a side only after its stable, extended calibration has lasted one second.
-    /// When both sides qualify, prefer the longer average projected arm chain because it is
-    /// more likely to face the camera and remain visible. Use average joint confidence only
-    /// when projected lengths are effectively tied; if both measures tie, keep calibrating.
-    private func selectedCalibrationSide(at timestamp: TimeInterval) -> Int? {
-        let completed = calibrations.filter {
-            timestamp - $0.value.startedAt >= RecognitionParameters.calibrationDuration
-        }
-        guard !completed.isEmpty else { return nil }
-        guard completed.count > 1 else { return completed.keys.first }
-        let ordered = completed.sorted { $0.key < $1.key }
-        guard let first = ordered.first, let second = ordered.dropFirst().first else { return nil }
-        let lengthDifference = first.value.averageArmLength - second.value.averageArmLength
-        if abs(lengthDifference) > RecognitionParameters.armLengthTieTolerance {
-            return lengthDifference > 0 ? first.key : second.key
-        }
-        let confidenceDifference = first.value.averageConfidence - second.value.averageConfidence
-        if abs(confidenceDifference) > RecognitionParameters.confidenceTieTolerance {
-            return confidenceDifference > 0 ? first.key : second.key
-        }
-        return nil
+    private func angles(from candidates: [PushUpSample]) -> [Int: Float] {
+        Dictionary(uniqueKeysWithValues: candidates.map { ($0.side, $0.angle) })
     }
 }

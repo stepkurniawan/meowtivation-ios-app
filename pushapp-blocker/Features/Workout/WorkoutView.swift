@@ -122,7 +122,7 @@ struct WorkoutView: View {
     /// A view that displays the live camera preview with the detected skeleton overlay and error messages.
     private var preview: some View {
         WorkoutPreview(session: model.camera.session, frame: model.latestFrame,
-                       showSkeleton: true, selectedSide: model.selectedSide,
+                       showSkeleton: true,
                        onRotation: model.updateRotation)
             .background(.black)
             .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -159,7 +159,7 @@ struct WorkoutView: View {
                 Text("Start!").font(.title.bold()).foregroundStyle(.green)
                     .accessibilityLabel("Start push-ups")
             }
-            if model.tracking == .findingPosition || model.tracking == .waitingForSelectedArm {
+            if model.tracking == .findingPosition || model.tracking == .waitingForArm {
                 Text(PushUp.placement).font(.caption).foregroundStyle(.secondary)
             }
             pushUpCountCard
@@ -167,8 +167,10 @@ struct WorkoutView: View {
                 Text(String(format: "%.1f fps · %.0f ms · %d usable joints", model.analysisFPS,
                             model.processingMilliseconds, model.latestFrame?.joints.values.filter(\.isUsable).count ?? 0))
                     .font(.caption.monospaced())
-                if let angle = model.pushUpAngle {
-                    Text("\(PushUp.title): \(Int(angle))°").font(.caption.monospaced())
+                if !model.armAngles.isEmpty {
+                    Text(model.armAngles.keys.sorted().map {
+                        "\($0 == 0 ? "Right" : "Left"): \(Int(model.armAngles[$0]!))°"
+                    }.joined(separator: " · ")).font(.caption.monospaced())
                 }
                 Text("Green: corroborated joint. Orange: rejected. A returned joint does not prove visibility.")
                     .font(.caption2)
@@ -222,7 +224,6 @@ private struct WorkoutPreview: UIViewRepresentable {
     let session: AVCaptureSession
     let frame: PoseFrame?
     let showSkeleton: Bool
-    let selectedSide: Int?
     let onRotation: (Double) -> Void
     func makeUIView(context: Context) -> WorkoutPreviewView {
         let view = WorkoutPreviewView()
@@ -231,8 +232,7 @@ private struct WorkoutPreview: UIViewRepresentable {
         return view
     }
     func updateUIView(_ view: WorkoutPreviewView, context: Context) {
-        view.frameData = showSkeleton && selectedSide != nil ? frame : nil
-        view.selectedSide = selectedSide
+        view.frameData = showSkeleton ? frame : nil
         view.imageAspect = frame?.imageAspectRatio ?? view.imageAspect
         view.setNeedsLayout()
     }
@@ -243,7 +243,6 @@ private final class WorkoutPreviewView: UIView {
     var preview: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
     var onRotation: ((Double) -> Void)?
     var frameData: PoseFrame?
-    var selectedSide: Int?
     var imageAspect = 9.0 / 16
     private var angle: Double?
     private let validJoints = CAShapeLayer()
@@ -288,14 +287,13 @@ private final class WorkoutPreviewView: UIView {
                     y: rect.minY + CGFloat(1 - joint.imagePoint.y) * rect.height)
         }
         let good = UIBezierPath(), bad = UIBezierPath()
-        if let frameData, let selectedSide {
-            let selectedJoints = BodyJoint.sides[selectedSide]
-            for (a, b) in BodyJoint.bones where selectedJoints.contains(a) && selectedJoints.contains(b) {
+        if let frameData {
+            for (a, b) in BodyJoint.bones {
                 if let start = frameData.joints[a], let end = frameData.joints[b], start.isUsable, end.isUsable {
                     good.move(to: point(start)); good.addLine(to: point(end))
                 }
             }
-            for bodyJoint in selectedJoints {
+            for bodyJoint in BodyJoint.armJoints {
                 guard let joint = frameData.joints[bodyJoint],
                       joint.imagePoint.x.isFinite, joint.imagePoint.y.isFinite else { continue }
                 let position = point(joint)

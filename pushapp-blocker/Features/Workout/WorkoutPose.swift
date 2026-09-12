@@ -3,7 +3,7 @@ import simd
 
 nonisolated enum PushUp {
     static let title = "Push-up"
-    static let placement = "Looking at the floor is fine. Keep the side of your head, upper body, and one shoulder, elbow, and wrist visible. Your legs can be out of frame."
+    static let placement = "Looking at the floor is fine. Keep the side of your head, upper body, and one shoulder, elbow, and wrist visible. Either arm can count; both are tracked when visible. Your legs can be out of frame."
 
     /// Returns one arm's image-space centre when Vision sees a reliable push-up arm.
     /// This is intentionally push-up-specific; other workouts must define their own target.
@@ -68,18 +68,15 @@ nonisolated enum RecognitionParameters {
     static let jointSpeedCoefficient: Float = 0.05
     static let jointDerivativeCutoff: Float = 1.0
     static let jointHoldDuration = 0.20
-    static let selectedArmDropoutGraceDuration = 0.25
+    static let armDropoutGraceDuration = 0.25
+    static let armRepDeduplicationDuration = 0.30
     static let calibrationDuration = 1.0
     static let calibrationJitter: Float = 0.025
-    static let confidenceTieTolerance: Float = 0.02
-    static let armLengthTieTolerance: Float = 0.01
 }
 
 nonisolated struct PushUpSample: Sendable {
     var angle: Float
     var side: Int
-    var confidence: Float
-    var armLength: Float
     var points: [SIMD2<Float>]
 }
 
@@ -97,9 +94,7 @@ nonisolated enum PoseFeatures {
         pushUpSamples(from: frame).first
     }
 
-    /// Returns all usable arm chains, ordered by the preferred side.
-    /// The recognition engine applies temporal side selection so a brief
-    /// confidence change cannot switch arms immediately.
+    /// Returns all usable arm chains for independent temporal tracking.
     static func pushUpSamples(from frame: PoseFrame) -> [PushUpSample] {
         guard !frame.cameraIsMoving else { return [] }
         return BodyJoint.sides.enumerated().compactMap { sideIndex, side in
@@ -126,9 +121,6 @@ nonisolated enum PoseFeatures {
         guard elbowAngle.isFinite else { return nil }
         return PushUpSample(angle: elbowAngle,
                             side: side,
-                            confidence: (shoulder.confidence2D + elbow.confidence2D + wrist.confidence2D) / 3,
-                            armLength: simd_distance(shoulder.position, elbow.position) +
-                                simd_distance(elbow.position, wrist.position),
                             points: [shoulder.position, elbow.position, wrist.position])
     }
 }

@@ -48,13 +48,12 @@ final class WorkoutSessionModel: ObservableObject {
     @Published private(set) var tracking = WorkoutTracking.findingPosition
     @Published private(set) var cameraState = WorkoutCameraState.idle
     @Published private(set) var latestFrame: PoseFrame?
-    @Published private(set) var pushUpAngle: Float?
+    @Published private(set) var armAngles: [Int: Float] = [:]
     @Published private(set) var processingMilliseconds = 0.0
     @Published private(set) var analysisFPS = 0.0
     @Published private(set) var hasStarted = false
     @Published private(set) var hasEnded = false
     @Published private(set) var isMuted = false
-    @Published private(set) var selectedSide: Int?
     @Published private(set) var startCueVisible = false
     private var engine = WorkoutRecognitionEngine()
     private var lastCreditedID: UInt64 = 0
@@ -83,7 +82,7 @@ final class WorkoutSessionModel: ObservableObject {
         engine.resetTracking()
         poseReady = false
         tracking = .findingPosition
-        selectedSide = nil
+        armAngles = [:]
         startCueVisible = false
         startCueUntil = -Double.infinity
         cameraState = .requestingPermission
@@ -98,8 +97,7 @@ final class WorkoutSessionModel: ObservableObject {
         engine.resetTracking()
         poseReady = false
         latestFrame = nil
-        pushUpAngle = nil
-        selectedSide = nil
+        armAngles = [:]
         startCueVisible = false
         startCueUntil = -Double.infinity
         lastFrameAt = nil
@@ -128,8 +126,7 @@ final class WorkoutSessionModel: ObservableObject {
         latestFrame = nil
         poseReady = false
         tracking = .findingPosition
-        pushUpAngle = nil
-        selectedSide = nil
+        armAngles = [:]
         startCueVisible = false
         startCueUntil = -Double.infinity
         speech.stop()
@@ -148,8 +145,7 @@ final class WorkoutSessionModel: ObservableObject {
                 latestFrame = nil
                 poseReady = false
                 tracking = .findingPosition
-                pushUpAngle = nil
-                selectedSide = nil
+                armAngles = [:]
                 startCueVisible = false
                 startCueUntil = -Double.infinity
                 lastFrameAt = nil
@@ -167,8 +163,7 @@ final class WorkoutSessionModel: ObservableObject {
             let update = engine.consume(frame)
             poseReady = update.poseReady
             tracking = update.tracking
-            pushUpAngle = update.pushUpAngle
-            selectedSide = update.selectedSide
+            armAngles = update.armAngles
             startCueVisible = frame.timestamp < startCueUntil
             if update.didStart {
                 startCueUntil = frame.timestamp + 1.5
@@ -187,7 +182,7 @@ final class WorkoutSessionModel: ObservableObject {
             } else if counted {
                 speech.say(pushUpCount == 1 ? "\(PushUp.title). \(pushUpCount)" : "\(pushUpCount)")
                 lastPromptAt = frame.timestamp
-            } else if update.tracking == .waitingForSelectedArm || update.tracking == .cameraMoving,
+            } else if update.tracking == .waitingForArm || update.tracking == .cameraMoving,
                       frame.timestamp - lastPromptAt >= 8 {
                 speech.say(update.tracking.message)
                 lastPromptAt = frame.timestamp
