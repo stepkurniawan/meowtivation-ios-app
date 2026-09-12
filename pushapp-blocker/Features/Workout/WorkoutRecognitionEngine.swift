@@ -99,12 +99,14 @@ nonisolated struct WorkoutRecognitionEngine {
     private var nextID: UInt64 = 0
     private var lastTimestamp: TimeInterval?
     private var selectedSide: Int?
+    private var selectedArmLostAt: TimeInterval?
     private var calibrations: [Int: CalibrationMeasurement] = [:]
 
     mutating func resetTracking() {
         detector = CycleDetector()
         lastTimestamp = nil
         selectedSide = nil
+        selectedArmLostAt = nil
         calibrations = [:]
         // Preserve the event sequence across resets to prevent duplicate credits.
     }
@@ -136,11 +138,16 @@ nonisolated struct WorkoutRecognitionEngine {
 
         guard let selectedSide,
               let sample = candidates.first(where: { $0.side == selectedSide }) else {
-            detector = CycleDetector()
+            let lostAt = selectedArmLostAt ?? frame.timestamp
+            selectedArmLostAt = lostAt
+            if frame.timestamp - lostAt > RecognitionParameters.selectedArmDropoutGraceDuration {
+                detector = CycleDetector()
+            }
             return PushUpRecognitionUpdate(tracking: .waitingForSelectedArm,
                                            selectedSide: selectedSide)
         }
 
+        selectedArmLostAt = nil
         let completed = detector.consume(sample, at: frame.timestamp)
         var reps: [PushUpRepEvent] = []
         if completed {

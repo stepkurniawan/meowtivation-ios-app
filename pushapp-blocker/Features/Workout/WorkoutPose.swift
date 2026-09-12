@@ -52,6 +52,7 @@ nonisolated enum RecognitionParameters {
     static let jointSpeedCoefficient: Float = 0.05
     static let jointDerivativeCutoff: Float = 1.0
     static let jointHoldDuration = 0.20
+    static let selectedArmDropoutGraceDuration = 0.25
     static let calibrationDuration = 1.0
     static let calibrationJitter: Float = 0.025
     static let confidenceTieTolerance: Float = 0.02

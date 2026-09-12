@@ -238,6 +238,43 @@ struct WorkoutRecognitionTests {
         #expect(!recovered.didStart)
     }
 
+    @Test func countsARepAfterBriefSelectedJointLoss() {
+        var engine = WorkoutFixtures.trackingEngine()
+        _ = engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1.1))
+        _ = engine.consume(WorkoutFixtures.frame(contraction: 1, time: 1.3))
+
+        var missingShoulder = WorkoutFixtures.frame(contraction: 1, time: 1.4)
+        missingShoulder.joints[.rightShoulder] = nil
+        let loss = engine.consume(missingShoulder)
+        #expect(loss.tracking == .waitingForSelectedArm)
+        #expect(!loss.poseReady)
+        #expect(loss.pushUpAngle == nil)
+        #expect(loss.reps.isEmpty)
+        #expect(loss.selectedSide == 0)
+
+        let recovered = engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1.55))
+        #expect(recovered.reps.count == 1)
+        #expect(recovered.selectedSide == 0)
+        #expect(!recovered.didStart)
+    }
+
+    @Test func selectedJointLossLongerThanGraceCancelsTheRep() {
+        var engine = WorkoutFixtures.trackingEngine()
+        _ = engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1.1))
+        _ = engine.consume(WorkoutFixtures.frame(contraction: 1, time: 1.3))
+
+        var missingShoulder = WorkoutFixtures.frame(contraction: 1, time: 1.4)
+        missingShoulder.joints[.rightShoulder] = nil
+        #expect(engine.consume(missingShoulder).reps.isEmpty)
+        missingShoulder.timestamp = 1.66
+        #expect(engine.consume(missingShoulder).reps.isEmpty)
+
+        let recovered = engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1.7))
+        #expect(recovered.reps.isEmpty)
+        #expect(recovered.selectedSide == 0)
+        #expect(!recovered.didStart)
+    }
+
     @Test func missingShoulderElbowOrWristMakesPoseNotReady() {
         for joint in [BodyJoint.leftShoulder, .leftElbow, .leftWrist] {
             var frame = WorkoutFixtures.frame(contraction: 0, time: 1)
@@ -268,7 +305,7 @@ struct WorkoutRecognitionTests {
     @Test func missingPoseDoesNotBridgeARep() {
         var engine = WorkoutFixtures.trackingEngine()
         let frames = WorkoutFixtures.sequence(reps: 1).enumerated().map { index, frame in
-            (30...31).contains(index) ? PoseFrame(timestamp: frame.timestamp, joints: [:]) : frame
+            (30...38).contains(index) ? PoseFrame(timestamp: frame.timestamp, joints: [:]) : frame
         }
         #expect(frames.flatMap { engine.consume($0).reps }.isEmpty)
     }
