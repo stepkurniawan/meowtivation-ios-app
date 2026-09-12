@@ -122,7 +122,8 @@ struct WorkoutView: View {
     /// A view that displays the live camera preview with the detected skeleton overlay and error messages.
     private var preview: some View {
         WorkoutPreview(session: model.camera.session, frame: model.latestFrame,
-                       showSkeleton: true, onRotation: model.updateRotation)
+                       showSkeleton: true, selectedSide: model.selectedSide,
+                       onRotation: model.updateRotation)
             .background(.black)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay {
@@ -154,7 +155,11 @@ struct WorkoutView: View {
                 .foregroundStyle(model.poseReady ? .green : .red)
                 .accessibilityLabel(model.poseReady ? "Pose ready" : "Pose not ready")
             Text(model.tracking.message).font(.callout).multilineTextAlignment(.center)
-            if model.tracking == .reposition {
+            if model.startCueVisible {
+                Text("Start!").font(.title.bold()).foregroundStyle(.green)
+                    .accessibilityLabel("Start push-ups")
+            }
+            if model.tracking == .findingPosition || model.tracking == .waitingForSelectedArm {
                 Text(PushUp.placement).font(.caption).foregroundStyle(.secondary)
             }
             pushUpCountCard
@@ -217,6 +222,7 @@ private struct WorkoutPreview: UIViewRepresentable {
     let session: AVCaptureSession
     let frame: PoseFrame?
     let showSkeleton: Bool
+    let selectedSide: Int?
     let onRotation: (Double) -> Void
     func makeUIView(context: Context) -> WorkoutPreviewView {
         let view = WorkoutPreviewView()
@@ -225,7 +231,8 @@ private struct WorkoutPreview: UIViewRepresentable {
         return view
     }
     func updateUIView(_ view: WorkoutPreviewView, context: Context) {
-        view.frameData = showSkeleton ? frame : nil
+        view.frameData = showSkeleton && selectedSide != nil ? frame : nil
+        view.selectedSide = selectedSide
         view.imageAspect = frame?.imageAspectRatio ?? view.imageAspect
         view.setNeedsLayout()
     }
@@ -236,6 +243,7 @@ private final class WorkoutPreviewView: UIView {
     var preview: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
     var onRotation: ((Double) -> Void)?
     var frameData: PoseFrame?
+    var selectedSide: Int?
     var imageAspect = 9.0 / 16
     private var angle: Double?
     private let validJoints = CAShapeLayer()
@@ -280,13 +288,16 @@ private final class WorkoutPreviewView: UIView {
                     y: rect.minY + CGFloat(1 - joint.imagePoint.y) * rect.height)
         }
         let good = UIBezierPath(), bad = UIBezierPath()
-        if let frameData {
-            for (a, b) in BodyJoint.bones {
+        if let frameData, let selectedSide {
+            let selectedJoints = BodyJoint.sides[selectedSide]
+            for (a, b) in BodyJoint.bones where selectedJoints.contains(a) && selectedJoints.contains(b) {
                 if let start = frameData.joints[a], let end = frameData.joints[b], start.isUsable, end.isUsable {
                     good.move(to: point(start)); good.addLine(to: point(end))
                 }
             }
-            for joint in frameData.joints.values where joint.imagePoint.x.isFinite && joint.imagePoint.y.isFinite {
+            for bodyJoint in selectedJoints {
+                guard let joint = frameData.joints[bodyJoint],
+                      joint.imagePoint.x.isFinite, joint.imagePoint.y.isFinite else { continue }
                 let position = point(joint)
                 (joint.isUsable ? good : bad).append(UIBezierPath(ovalIn:
                     CGRect(x: position.x - 3, y: position.y - 3, width: 6, height: 6)))

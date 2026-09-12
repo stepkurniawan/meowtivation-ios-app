@@ -11,12 +11,11 @@ nonisolated enum BodyJoint: String, CaseIterable, Codable, Sendable {
     case rightShoulder, rightElbow, rightWrist, rightHip, rightKnee, rightAnkle
 
     static let sides: [[BodyJoint]] = [
-        [.rightShoulder, .rightElbow, .rightWrist, .rightHip, .rightKnee, .rightAnkle],
-        [.leftShoulder, .leftElbow, .leftWrist, .leftHip, .leftKnee, .leftAnkle]
+        [.rightShoulder, .rightElbow, .rightWrist],
+        [.leftShoulder, .leftElbow, .leftWrist]
     ]
-    static let bones: [(BodyJoint, BodyJoint)] = sides.flatMap {
-        [($0[0], $0[1]), ($0[1], $0[2]), ($0[0], $0[3]), ($0[3], $0[4]), ($0[4], $0[5])]
-    } + [(.leftShoulder, .rightShoulder), (.leftHip, .rightHip)]
+    static let armJoints = sides.flatMap { $0 }
+    static let bones: [(BodyJoint, BodyJoint)] = sides.flatMap { [($0[0], $0[1]), ($0[1], $0[2])] }
 }
 
 /// Normalized image-space joint positions with the origin at the lower left.
@@ -53,13 +52,18 @@ nonisolated enum RecognitionParameters {
     static let jointSpeedCoefficient: Float = 0.05
     static let jointDerivativeCutoff: Float = 1.0
     static let jointHoldDuration = 0.20
-    static let poseLossGracePeriod = 0.30
-    static let sideSwitchGracePeriod = 0.30
+    static let calibrationDuration = 1.0
+    static let calibrationJitter: Float = 0.025
+    static let confidenceTieTolerance: Float = 0.02
+    static let armLengthTieTolerance: Float = 0.01
 }
 
 nonisolated struct PushUpSample: Sendable {
     var angle: Float
     var side: Int
+    var confidence: Float
+    var armLength: Float
+    var points: [SIMD2<Float>]
 }
 
 /// The angle between three points, in degrees. The angle is at the second point, with the first and third points forming the rays.
@@ -103,7 +107,12 @@ nonisolated enum PoseFeatures {
         }
         let elbowAngle = angle(shoulder.position, elbow.position, wrist.position)
         guard elbowAngle.isFinite else { return nil }
-        return PushUpSample(angle: elbowAngle, side: side)
+        return PushUpSample(angle: elbowAngle,
+                            side: side,
+                            confidence: (shoulder.confidence2D + elbow.confidence2D + wrist.confidence2D) / 3,
+                            armLength: simd_distance(shoulder.position, elbow.position) +
+                                simd_distance(elbow.position, wrist.position),
+                            points: [shoulder.position, elbow.position, wrist.position])
     }
 }
 
@@ -175,7 +184,7 @@ nonisolated struct PoseStabilizer {
     mutating func stabilize(_ rawJoints: [BodyJoint: PoseJoint],
                             at timestamp: TimeInterval) -> [BodyJoint: PoseJoint] {
         var result: [BodyJoint: PoseJoint] = [:]
-        for joint in BodyJoint.allCases {
+        for joint in BodyJoint.armJoints {
             if let raw = rawJoints[joint], isValid(raw),
                raw.confidence2D >= RecognitionParameters.minimumConfidence {
                 var track = tracks[joint] ?? Track()

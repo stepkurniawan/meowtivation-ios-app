@@ -6,6 +6,22 @@ import Testing
 
 /// Synthetic camera-space motion. These prove the angle state machine, not Vision accuracy.
 nonisolated enum WorkoutFixtures {
+    static func calibrationFrames(start: Double = 0) -> [PoseFrame] {
+        stride(from: 0.0, through: RecognitionParameters.calibrationDuration, by: 0.1).map {
+            var frame = frame(contraction: 0, time: start + $0)
+            for joint in BodyJoint.sides[0] {
+                frame.joints[joint]?.confidence2D = 0.98
+            }
+            return frame
+        }
+    }
+
+    static func trackingEngine() -> WorkoutRecognitionEngine {
+        var engine = WorkoutRecognitionEngine()
+        for frame in calibrationFrames() { _ = engine.consume(frame) }
+        return engine
+    }
+
     static func frame(contraction: Float, time: Double) -> PoseFrame {
         let height: Float = 0.595 - contraction * 0.26
         let wrist: SIMD2<Float> = [0, 0]
@@ -58,11 +74,30 @@ nonisolated enum WorkoutFixtures {
             return frame(contraction: contraction, time: start + elapsed)
         }
     }
+
+    static func withConfidence(_ frame: PoseFrame, side: Int, confidence: Float) -> PoseFrame {
+        var copy = frame
+        for joint in BodyJoint.sides[side] { copy.joints[joint]?.confidence2D = confidence }
+        return copy
+    }
+
+    static func withScaledArm(_ frame: PoseFrame, side: Int, scale: Float) -> PoseFrame {
+        var copy = frame
+        let joints = BodyJoint.sides[side]
+        guard let elbow = copy.joints[joints[1]] else { return copy }
+        for joint in [joints[0], joints[2]] {
+            guard var value = copy.joints[joint] else { continue }
+            value.position = elbow.position + (value.position - elbow.position) * scale
+            value.imagePoint = elbow.imagePoint + (value.imagePoint - elbow.imagePoint) * scale
+            copy.joints[joint] = value
+        }
+        return copy
+    }
 }
 
 struct WorkoutRecognitionTests {
     @Test func countsOnlyAStableAngleDownThenUpCycle() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let events = WorkoutFixtures.sequence().flatMap { engine.consume($0).reps }
 
         #expect(events.count == 3)
@@ -71,13 +106,13 @@ struct WorkoutRecognitionTests {
 
     @Test(arguments: [1.4, 4.5, 6.0])
     func supportsDifferentRepSpeeds(_ duration: Double) {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let events = WorkoutFixtures.sequence(duration: duration).flatMap { engine.consume($0).reps }
         #expect(events.count == 3, "Push-ups at \(duration) seconds")
     }
 
     @Test func countsFastPushUpSampledAtThirtyFramesPerSecond() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let events = WorkoutFixtures.sequence(reps: 1, duration: 0.4,
                                                sampleFPS: RecognitionParameters.targetFPS)
             .flatMap { engine.consume($0).reps }
@@ -87,7 +122,7 @@ struct WorkoutRecognitionTests {
 
     @Test func countsFastConsecutiveRepsAfterPoseStabilization() {
         var stabilizer = PoseStabilizer()
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = WorkoutFixtures.sequence(reps: 3, duration: 0.4,
                                                sampleFPS: RecognitionParameters.targetFPS).map { frame in
             var stabilized = frame
@@ -101,69 +136,69 @@ struct WorkoutRecognitionTests {
     }
 
     @Test func countsThirtyHundredthsSecondDownAndUpCycle() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = [
-            WorkoutFixtures.frame(contraction: 0, time: 1.0),
-            WorkoutFixtures.frame(contraction: 1, time: 1.15),
-            WorkoutFixtures.frame(contraction: 0, time: 1.30)
+            WorkoutFixtures.frame(contraction: 0, time: 1.1),
+            WorkoutFixtures.frame(contraction: 1, time: 1.25),
+            WorkoutFixtures.frame(contraction: 0, time: 1.40)
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
     }
 
     @Test func countsCycleThatReachesPragmaticDepth() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let events = WorkoutFixtures.sequence(amplitude: 0.70).flatMap { engine.consume($0).reps }
         #expect(events.count == 3)
     }
 
     @Test func countsAtMaximumContractedAngle() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = [
-            WorkoutFixtures.frame(angle: 160, time: 1.0),
-            WorkoutFixtures.frame(angle: 90, time: 1.2),
-            WorkoutFixtures.frame(angle: 160, time: 1.4)
+            WorkoutFixtures.frame(angle: 160, time: 1.1),
+            WorkoutFixtures.frame(angle: 90, time: 1.3),
+            WorkoutFixtures.frame(angle: 160, time: 1.5)
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
     }
 
     @Test func doesNotCountShallowAngleCycles() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let events = WorkoutFixtures.sequence(amplitude: 0.35).flatMap { engine.consume($0).reps }
         #expect(events.isEmpty)
     }
 
     @Test func countsWithoutDwellDuringDownAndUpMotion() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = [
-            WorkoutFixtures.frame(contraction: 0, time: 1),
-            WorkoutFixtures.frame(contraction: 1, time: 1.3),
-            WorkoutFixtures.frame(contraction: 0, time: 1.4)
+            WorkoutFixtures.frame(contraction: 0, time: 1.1),
+            WorkoutFixtures.frame(contraction: 1, time: 1.4),
+            WorkoutFixtures.frame(contraction: 0, time: 1.5)
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
     }
 
     @Test func countsConsecutiveCyclesWithoutWaitingBetweenReps() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = [
-            WorkoutFixtures.frame(angle: 160, time: 1.0),
-            WorkoutFixtures.frame(angle: 30, time: 1.2),
-            WorkoutFixtures.frame(angle: 160, time: 1.4),
-            WorkoutFixtures.frame(angle: 30, time: 1.6),
-            WorkoutFixtures.frame(angle: 160, time: 1.8)
+            WorkoutFixtures.frame(angle: 160, time: 1.1),
+            WorkoutFixtures.frame(angle: 30, time: 1.3),
+            WorkoutFixtures.frame(angle: 160, time: 1.5),
+            WorkoutFixtures.frame(angle: 30, time: 1.7),
+            WorkoutFixtures.frame(angle: 160, time: 1.9)
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 2)
     }
 
     @Test func heldRecoveryAngleDoesNotCreateAdditionalReps() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = [
-            WorkoutFixtures.frame(angle: 160, time: 1.0),
-            WorkoutFixtures.frame(angle: 30, time: 1.2),
-            WorkoutFixtures.frame(angle: 160, time: 1.4),
+            WorkoutFixtures.frame(angle: 160, time: 1.1),
+            WorkoutFixtures.frame(angle: 30, time: 1.3),
+            WorkoutFixtures.frame(angle: 160, time: 1.5),
             WorkoutFixtures.frame(angle: 160, time: 1.8),
             WorkoutFixtures.frame(angle: 160, time: 2.2)
         ]
@@ -189,15 +224,18 @@ struct WorkoutRecognitionTests {
         #expect(PoseFeatures.pushUpSample(from: frame)?.side == 1)
     }
 
-    @Test func brieflyMissingPreferredArmDoesNotSwitchSides() {
-        var engine = WorkoutRecognitionEngine()
-        #expect(engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1)).poseReady)
+    @Test func brieflyMissingSelectedArmDoesNotSwitchSides() {
+        var engine = WorkoutFixtures.trackingEngine()
+        #expect(engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1.1)).poseReady)
 
-        var leftOnly = WorkoutFixtures.frame(contraction: 0, time: 1.1)
+        var leftOnly = WorkoutFixtures.frame(contraction: 0, time: 1.2)
         for joint in BodyJoint.sides[0].prefix(3) { leftOnly.joints[joint] = nil }
         #expect(!engine.consume(leftOnly).poseReady)
 
-        #expect(engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1.2)).poseReady)
+        let recovered = engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1.3))
+        #expect(recovered.poseReady)
+        #expect(recovered.selectedSide == 0)
+        #expect(!recovered.didStart)
     }
 
     @Test func missingShoulderElbowOrWristMakesPoseNotReady() {
@@ -211,32 +249,32 @@ struct WorkoutRecognitionTests {
     }
 
     @Test func partialAngleExcursionAndAHoldDoNotCount() {
-        var partialEngine = WorkoutRecognitionEngine()
+        var partialEngine = WorkoutFixtures.trackingEngine()
         let partial = WorkoutFixtures.sequence(amplitude: 0.03)
         #expect(partial.flatMap { partialEngine.consume($0).reps }.isEmpty)
 
-        var holdEngine = WorkoutRecognitionEngine()
+        var holdEngine = WorkoutFixtures.trackingEngine()
         let extended = (0..<45).map { WorkoutFixtures.frame(contraction: 0, time: 1 + Double($0) / 15) }
         let contracted = (0..<180).map { WorkoutFixtures.frame(contraction: 1, time: 5 + Double($0) / 15) }
         #expect((extended + contracted).flatMap { holdEngine.consume($0).reps }.isEmpty)
     }
 
     @Test func missingFramesDoNotBridgeARep() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = WorkoutFixtures.sequence(reps: 1).filter { !(2.1...2.8).contains($0.timestamp) }
         #expect(frames.flatMap { engine.consume($0).reps }.isEmpty)
     }
 
-    @Test func briefPoseDropoutDoesNotResetARep() {
-        var engine = WorkoutRecognitionEngine()
+    @Test func missingPoseDoesNotBridgeARep() {
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = WorkoutFixtures.sequence(reps: 1).enumerated().map { index, frame in
             (30...31).contains(index) ? PoseFrame(timestamp: frame.timestamp, joints: [:]) : frame
         }
-        #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
+        #expect(frames.flatMap { engine.consume($0).reps }.isEmpty)
     }
 
     @Test func duplicateFramesAndInvalidTimestampsDoNotCount() {
-        var engine = WorkoutRecognitionEngine()
+        var engine = WorkoutFixtures.trackingEngine()
         let frames = WorkoutFixtures.sequence(reps: 1)
         var events: [PushUpRepEvent] = []
         for frame in frames {
@@ -248,12 +286,75 @@ struct WorkoutRecognitionTests {
     }
 
     @Test func cameraMovementResetsReadiness() {
-        var engine = WorkoutRecognitionEngine()
-        #expect(engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1)).poseReady)
+        var engine = WorkoutFixtures.trackingEngine()
+        #expect(engine.consume(WorkoutFixtures.frame(contraction: 0, time: 1.1)).poseReady)
 
-        var moving = WorkoutFixtures.frame(contraction: 0, time: 2)
+        var moving = WorkoutFixtures.frame(contraction: 0, time: 1.2)
         moving.cameraIsMoving = true
         #expect(!engine.consume(moving).poseReady)
+    }
+
+    @Test func requiresAnExtendedStillPositionForOneSecondBeforeStarting() {
+        var engine = WorkoutRecognitionEngine()
+        var bent = WorkoutFixtures.frame(angle: 90, time: 0)
+        bent = WorkoutFixtures.withConfidence(bent, side: 0, confidence: 0.98)
+        #expect(engine.consume(bent).tracking == .findingPosition)
+
+        let early = WorkoutFixtures.withConfidence(WorkoutFixtures.frame(angle: 160, time: 0.5), side: 0, confidence: 0.98)
+        #expect(engine.consume(early).tracking == .validatingPosition)
+        let halfway = WorkoutFixtures.withConfidence(WorkoutFixtures.frame(angle: 160, time: 1.0), side: 0, confidence: 0.98)
+        #expect(!engine.consume(halfway).didStart)
+        let ready = WorkoutFixtures.withConfidence(WorkoutFixtures.frame(angle: 160, time: 1.5), side: 0, confidence: 0.98)
+        #expect(engine.consume(ready).didStart)
+    }
+
+    @Test func choosesHigherConfidenceArmAfterCalibration() {
+        var engine = WorkoutRecognitionEngine()
+        var update = PushUpRecognitionUpdate(tracking: .findingPosition)
+        for time in stride(from: 0.0, through: 1.0, by: 0.1) {
+            var frame = WorkoutFixtures.frame(angle: 160, time: time)
+            frame = WorkoutFixtures.withConfidence(frame, side: 1, confidence: 0.99)
+            update = engine.consume(frame)
+        }
+        #expect(update.didStart)
+        #expect(update.selectedSide == 1)
+    }
+
+    @Test func choosesLongerArmWhenConfidenceIsTied() {
+        var engine = WorkoutRecognitionEngine()
+        var update = PushUpRecognitionUpdate(tracking: .findingPosition)
+        for time in stride(from: 0.0, through: 1.0, by: 0.1) {
+            var frame = WorkoutFixtures.frame(angle: 160, time: time)
+            frame = WorkoutFixtures.withScaledArm(frame, side: 1, scale: 1.15)
+            update = engine.consume(frame)
+        }
+        #expect(update.didStart)
+        #expect(update.selectedSide == 1)
+    }
+
+    @Test func unresolvedCalibrationTieKeepsWaiting() {
+        var engine = WorkoutRecognitionEngine()
+        var update = PushUpRecognitionUpdate(tracking: .findingPosition)
+        for time in stride(from: 0.0, through: 1.0, by: 0.1) {
+            update = engine.consume(WorkoutFixtures.frame(angle: 160, time: time))
+        }
+        #expect(update.tracking == .validatingPosition)
+        #expect(!update.didStart)
+    }
+
+    @Test func jitterRestartsCalibration() {
+        var engine = WorkoutRecognitionEngine()
+        let first = WorkoutFixtures.withConfidence(WorkoutFixtures.frame(angle: 160, time: 0), side: 0, confidence: 0.98)
+        var onlyRight = first
+        for joint in BodyJoint.sides[1] { onlyRight.joints[joint] = nil }
+        #expect(engine.consume(onlyRight).tracking == .validatingPosition)
+        var shifted = WorkoutFixtures.withConfidence(WorkoutFixtures.frame(angle: 160, time: 0.5), side: 0, confidence: 0.98)
+        for joint in BodyJoint.sides[1] { shifted.joints[joint] = nil }
+        for joint in BodyJoint.sides[0] {
+            shifted.joints[joint]?.position.x += 0.1
+            shifted.joints[joint]?.imagePoint.x += 0.1
+        }
+        #expect(engine.consume(shifted).tracking == .findingPosition)
     }
 }
 
@@ -281,8 +382,9 @@ nonisolated private final class TestWorkoutCamera: WorkoutCameraControlling {
         model.receive(.state(.running), generation: camera.generation)
         #expect(!model.poseReady)
 
-        model.receive(.frame(WorkoutFixtures.frame(contraction: 0, time: 1), milliseconds: 20),
-                      generation: camera.generation)
+        for frame in WorkoutFixtures.calibrationFrames() {
+            model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
+        }
         #expect(model.poseReady)
 
         var incomplete = WorkoutFixtures.frame(contraction: 0, time: 2)
@@ -300,6 +402,9 @@ nonisolated private final class TestWorkoutCamera: WorkoutCameraControlling {
         let model = WorkoutSessionModel(speech: speech, cameraFactory: { _ in camera })
         model.start()
         model.receive(.state(.running), generation: camera.generation)
+        for frame in WorkoutFixtures.calibrationFrames() {
+            model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
+        }
         for frame in WorkoutFixtures.sequence() {
             model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
         }
@@ -314,5 +419,34 @@ nonisolated private final class TestWorkoutCamera: WorkoutCameraControlling {
         model.end()
         #expect(model.hasEnded)
         #expect(camera.stops > 0)
+    }
+
+    @Test func sessionShowsAndSpeaksTheStartCueOnlyAfterCalibration() {
+        let camera = TestWorkoutCamera(), speech = TestWorkoutSpeech()
+        let model = WorkoutSessionModel(speech: speech, cameraFactory: { _ in camera })
+        model.start()
+        model.receive(.state(.running), generation: camera.generation)
+
+        for frame in WorkoutFixtures.calibrationFrames() {
+            model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
+        }
+
+        #expect(model.startCueVisible)
+        #expect(speech.spoken == ["Start!"])
+    }
+
+    @Test func mutedSessionStillShowsTheStartCue() {
+        let camera = TestWorkoutCamera(), speech = TestWorkoutSpeech()
+        let model = WorkoutSessionModel(speech: speech, cameraFactory: { _ in camera })
+        model.start()
+        model.toggleMute()
+        model.receive(.state(.running), generation: camera.generation)
+
+        for frame in WorkoutFixtures.calibrationFrames() {
+            model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
+        }
+
+        #expect(model.startCueVisible)
+        #expect(speech.spoken.isEmpty)
     }
 }

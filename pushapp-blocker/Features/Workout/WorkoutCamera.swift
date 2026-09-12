@@ -215,7 +215,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             let observations = pose2D.results ?? []
             var rawJoints: [BodyJoint: PoseJoint] = [:]
             if let body = observations.first {
-                for joint in BodyJoint.allCases {
+                for joint in BodyJoint.armJoints {
                     guard let point2D = try? body.recognizedPoint(joint.vision2DName) else { continue }
                     let observed = SIMD2(Float(point2D.location.x), Float(point2D.location.y))
                     rawJoints[joint] = PoseJoint(position: observed,
