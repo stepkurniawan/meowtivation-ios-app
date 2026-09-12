@@ -186,24 +186,30 @@ an Apple requirement.
 
 ### Workout feature
 
-The Workout feature uses the iPhone's front camera and Vision body-pose tracking
-to recognize push-ups, count repetitions, and provide spoken and on-screen
-feedback.
+The Workout feature keeps reusable camera and pose infrastructure at its root.
+Exercise-specific code lives in its own folder; currently that is PushUp.
 
-- [`WorkoutView.swift`](pushapp-blocker/Features/Workout/WorkoutView.swift)
+- [`PushUpView.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpView.swift)
   displays setup instructions, the live camera preview, the push-up count,
   tracking status, optional diagnostics, and the completed
   session summary. It also pauses and resumes with the app's scene phase.
-- [`WorkoutSessionModel.swift`](pushapp-blocker/Features/Workout/WorkoutSessionModel.swift)
+- [`PushUpSessionModel.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpSessionModel.swift)
   coordinates the session lifecycle, push-up count, camera state, orientation, speech
   feedback, and published view state.
 - [`WorkoutCamera.swift`](pushapp-blocker/Features/Workout/WorkoutCamera.swift)
   owns camera permission, capture, Vision processing, interruptions, runtime
-  errors, device rotation, and `PoseFrame` delivery.
+  errors, device rotation, and configured `PoseFrame` delivery.
 - [`WorkoutPose.swift`](pushapp-blocker/Features/Workout/WorkoutPose.swift)
-  defines the push-up arm-joint mapping, pose data, angle thresholds, and
-  visibility checks.
-- [`WorkoutRecognitionEngine.swift`](pushapp-blocker/Features/Workout/WorkoutRecognitionEngine.swift)
+  defines shared pose data, geometry, filtering, and the exercise-supplied
+  `WorkoutPoseConfiguration`.
+- [`WorkoutPreview.swift`](pushapp-blocker/Features/Workout/WorkoutPreview.swift)
+  draws the configured exercise joints and bones over the live camera preview.
+- [`WorkoutSpeech.swift`](pushapp-blocker/Features/Workout/WorkoutSpeech.swift)
+  provides spoken workout feedback.
+- [`PushUp.swift`](pushapp-blocker/Features/Workout/PushUp/PushUp.swift) and
+  [`PushUpPose.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpPose.swift)
+  define the push-up arm chains, camera target, pose samples, and thresholds.
+- [`PushUpRecognitionEngine.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpRecognitionEngine.swift)
   is the pure temporal push-up classifier. It uses stabilized elbow angles,
   detects a stable down-then-up cycle, and reports tracking status and
   repetitions.
@@ -213,7 +219,7 @@ events and valid frames; the model passes frames to the recognition engine, then
 updates the push-up count and optionally triggers `WorkoutSpeech`. The recognition engine
 has no camera, Vision, speech, persistence, or blocking dependencies.
 
-For changes, use the view for layout and controls, the session model for
-lifecycle and camera-event handling, the camera for capture and Vision behavior,
-the pose model for push-up joints and thresholds, and the recognition engine for
+For changes, use the exercise view and session model for exercise-specific UI
+and lifecycle behavior, the camera for capture and Vision behavior, the root
+pose files for reusable pose handling, and the exercise recognition engine for
 repetition detection and tracking states.

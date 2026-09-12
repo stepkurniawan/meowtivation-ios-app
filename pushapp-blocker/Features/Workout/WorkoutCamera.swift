@@ -9,10 +9,10 @@ nonisolated enum WorkoutCameraState: Equatable, Sendable {
     var message: String {
         switch self {
         case .idle: "Camera paused"
-        case .requestingPermission: "Allow camera access to count push-ups."
+        case .requestingPermission: "Allow camera access to start your workout."
         case .running: ""
-        case .denied: "Allow Camera access in Settings to start counting push-ups."
-        case .unavailable: "A front camera is unavailable. Use a physical iPhone to track push-ups."
+        case .denied: "Allow Camera access in Settings to start your workout."
+        case .unavailable: "A front camera is unavailable. Use a physical iPhone to track your workout."
         case .interrupted: "Camera interrupted. Tracking will resume when the camera is available."
         case .failed(let message): message
         }
@@ -39,6 +39,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     private let output = AVCaptureVideoDataOutput()
     private let motion = CMMotionManager()
     private let pose2D = VNDetectHumanBodyPoseRequest()
+    private let configuration: WorkoutPoseConfiguration
     private let onEvent: @Sendable (Int, WorkoutCameraEvent) -> Void
     private var observers: [NSObjectProtocol] = []
     private var device: AVCaptureDevice?
@@ -50,9 +51,11 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     private var rotation = 90.0
     private var movingUntil = 0.0
     private var poseStabilizer = PoseStabilizer()
-    private var didSetPushUpCameraTarget = false
+    private var didSetCameraTarget = false
 
-    init(onEvent: @escaping @Sendable (Int, WorkoutCameraEvent) -> Void) {
+    init(configuration: WorkoutPoseConfiguration,
+         onEvent: @escaping @Sendable (Int, WorkoutCameraEvent) -> Void) {
+        self.configuration = configuration
         self.onEvent = onEvent
         super.init()
         for name in [AVCaptureSession.wasInterruptedNotification,
@@ -82,7 +85,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             failures = 0
             lastAnalysis = -.infinity
             poseStabilizer.reset()
-            didSetPushUpCameraTarget = false
+            didSetCameraTarget = false
             switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized: configureAndStart()
             case .notDetermined:
@@ -114,7 +117,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             applyRotation()
             lastAnalysis = -.infinity
             poseStabilizer.reset()
-            didSetPushUpCameraTarget = false
+            didSetCameraTarget = false
             if let device { configureAutomaticFocusAndExposure(on: device, at: CGPoint(x: 0.5, y: 0.5)) }
             movingUntil = ProcessInfo.processInfo.systemUptime + 0.75
             emit(.frame(PoseFrame(timestamp: ProcessInfo.processInfo.systemUptime, joints: [:],
@@ -161,7 +164,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     }
 
     private func requestTargetFrameRate(on device: AVCaptureDevice) {
-        let targetFPS = RecognitionParameters.targetFPS
+        let targetFPS = PoseDetectionParameters.targetFPS
         guard device.activeFormat.videoSupportedFrameRateRanges.contains(where: {
             $0.minFrameRate <= targetFPS && targetFPS <= $0.maxFrameRate
         }) else { return }
@@ -219,7 +222,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                        from connection: AVCaptureConnection) {
         guard active, !session.isInterrupted else { return }
         let now = ProcessInfo.processInfo.systemUptime
-        guard now - lastAnalysis >= 1.0 / RecognitionParameters.targetFPS else { return }
+        guard now - lastAnalysis >= 1.0 / PoseDetectionParameters.targetFPS else { return }
         lastAnalysis = now
         if let reading = motion.deviceMotion {
             let rate = reading.rotationRate, acceleration = reading.userAcceleration
@@ -236,7 +239,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             let observations = pose2D.results ?? []
             var rawJoints: [BodyJoint: PoseJoint] = [:]
             if let body = observations.first {
-                for joint in BodyJoint.armJoints {
+                for joint in configuration.trackedJoints {
                     guard let point2D = try? body.recognizedPoint(joint.vision2DName) else { continue }
                     let observed = SIMD2(Float(point2D.location.x), Float(point2D.location.y))
                     rawJoints[joint] = PoseJoint(position: observed,
@@ -244,13 +247,15 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                                                   confidence2D: point2D.confidence)
                 }
             }
-            if !didSetPushUpCameraTarget, let target = PushUp.cameraTarget(from: rawJoints), let device {
+            if !didSetCameraTarget, let target = configuration.cameraTarget(rawJoints), let device {
                 // Vision image points start at the lower left; AVCapture points start at the upper left.
                 configureAutomaticFocusAndExposure(on: device,
                                                     at: CGPoint(x: CGFloat(target.x), y: CGFloat(1 - target.y)))
-                didSetPushUpCameraTarget = true
+                didSetCameraTarget = true
             }
-            let joints = poseStabilizer.stabilize(rawJoints, at: now)
+            let joints = poseStabilizer.stabilize(rawJoints,
+                                                  tracking: configuration.trackedJoints,
+                                                  at: now)
             failures = 0
             let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)
             let aspect = imageBuffer.map { Double(CVPixelBufferGetWidth($0)) / Double(CVPixelBufferGetHeight($0)) } ?? 9.0 / 16
@@ -261,7 +266,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             failures += 1
             emit(.frame(PoseFrame(timestamp: now, joints: [:]), milliseconds: 0))
             if failures >= 3 {
-                emit(.state(.failed("Body tracking is unavailable. Try again with the push-up joints visible.")))
+                emit(.state(.failed("Body tracking is unavailable. Try again with the required joints visible.")))
                 active = false
                 motion.stopDeviceMotionUpdates()
                 session.stopRunning()

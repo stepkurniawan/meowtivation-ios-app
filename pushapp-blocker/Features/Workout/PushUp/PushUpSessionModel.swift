@@ -1,51 +1,11 @@
-import AVFoundation // AVSpeechSynthesizer
 import Combine // ObservableObject
 import Foundation // Date
 
 @MainActor
-protocol WorkoutSpeaking: AnyObject {
-    func say(_ text: String)
-    func stop()
-}
-
-/// A concrete implementation of `WorkoutSpeaking` that uses `AVSpeechSynthesizer` to speak text aloud.
-@MainActor
-final class WorkoutSpeech: NSObject, WorkoutSpeaking, AVSpeechSynthesizerDelegate {
-    private let synthesizer = AVSpeechSynthesizer()
-    private let voice: AVSpeechSynthesisVoice?
-    override init() {
-        voice = AVSpeechSynthesisVoice(language: "en-US")
-        super.init()
-        synthesizer.delegate = self
-    }
-    func say(_ text: String) {
-        synthesizer.stopSpeaking(at: .immediate)
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-            try session.setActive(true)
-            let utterance = AVSpeechUtterance(string: text)
-            utterance.voice = voice
-            synthesizer.speak(utterance)
-        } catch { /* Visual feedback remains available if audio cannot start. */ }
-    }
-    func stop() {
-        synthesizer.stopSpeaking(at: .immediate)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor [weak self] in
-            guard let self, !self.synthesizer.isSpeaking else { return }
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        }
-    }
-}
-
-@MainActor
-final class WorkoutSessionModel: ObservableObject {
+final class PushUpSessionModel: ObservableObject {
     @Published private(set) var pushUpCount = 0
     @Published private(set) var poseReady = false
-    @Published private(set) var tracking = WorkoutTracking.findingPosition
+    @Published private(set) var tracking = PushUpTrackingState.findingPosition
     @Published private(set) var cameraState = WorkoutCameraState.idle
     @Published private(set) var latestFrame: PoseFrame?
     @Published private(set) var armAngles: [Int: Float] = [:]
@@ -55,7 +15,7 @@ final class WorkoutSessionModel: ObservableObject {
     @Published private(set) var hasEnded = false
     @Published private(set) var isMuted = false
     @Published private(set) var startCueVisible = false
-    private var engine = WorkoutRecognitionEngine()
+    private var engine = PushUpRecognitionEngine()
     private var lastCreditedID: UInt64 = 0
     private var lastPromptAt = -Double.infinity
     private var lastFrameAt: Double?
@@ -67,7 +27,9 @@ final class WorkoutSessionModel: ObservableObject {
     private var cameraStorage: (any WorkoutCameraControlling)!
     var camera: any WorkoutCameraControlling { cameraStorage }
     init(speech: (any WorkoutSpeaking)? = nil,
-         cameraFactory: (@escaping @Sendable (Int, WorkoutCameraEvent) -> Void) -> any WorkoutCameraControlling = { WorkoutCamera(onEvent: $0) }) {
+         cameraFactory: (@escaping @Sendable (Int, WorkoutCameraEvent) -> Void) -> any WorkoutCameraControlling = {
+             WorkoutCamera(configuration: PushUp.poseConfiguration, onEvent: $0)
+         }) {
         self.speech = speech ?? WorkoutSpeech()
         cameraStorage = cameraFactory { [weak self] token, event in
             Task { @MainActor [weak self] in self?.receive(event, generation: token) }

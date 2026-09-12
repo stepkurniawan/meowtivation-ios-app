@@ -1,7 +1,7 @@
 import Foundation
 import simd
 
-nonisolated enum WorkoutTracking: Equatable, Sendable {
+nonisolated enum PushUpTrackingState: Equatable, Sendable {
     case findingPosition, validatingPosition, ready, tracking, waitingForArm, cameraMoving
 
     var message: String {
@@ -22,7 +22,7 @@ nonisolated struct PushUpRepEvent: Identifiable, Sendable {
 }
 
 nonisolated struct PushUpRecognitionUpdate: Sendable {
-    var tracking: WorkoutTracking
+    var tracking: PushUpTrackingState
     var poseReady = false
     var armAngles: [Int: Float] = [:]
     var didStart = false
@@ -36,23 +36,23 @@ nonisolated private struct CycleDetector {
 
     mutating func consume(_ raw: PushUpSample, at time: TimeInterval) -> Bool {
         let angle = raw.angle
-        if phase != .waiting, time - startedAt > RecognitionParameters.maximumCycleDuration {
+        if phase != .waiting, time - startedAt > PushUpRecognitionParameters.maximumCycleDuration {
             phase = .waiting
         }
 
         switch phase {
         case .waiting:
-            guard angle >= RecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle >= PushUpRecognitionParameters.minimumRecoveryAngle else { return false }
             phase = .extended
             startedAt = time
         case .extended:
-            guard angle <= RecognitionParameters.maximumContractedAngle else { return false }
+            guard angle <= PushUpRecognitionParameters.maximumContractedAngle else { return false }
             phase = .contracted
         case .contracted:
-            guard angle >= RecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle >= PushUpRecognitionParameters.minimumRecoveryAngle else { return false }
             let duration = time - startedAt
-            let valid = duration >= RecognitionParameters.minimumCycleDuration &&
-                duration <= RecognitionParameters.maximumCycleDuration
+            let valid = duration >= PushUpRecognitionParameters.minimumCycleDuration &&
+                duration <= PushUpRecognitionParameters.maximumCycleDuration
             phase = .extended
             startedAt = time
             return valid
@@ -62,7 +62,7 @@ nonisolated private struct CycleDetector {
 }
 
 /// Pure setup and rep classifier. No Vision, camera, persistence, speech, or blocking dependencies.
-nonisolated struct WorkoutRecognitionEngine {
+nonisolated struct PushUpRecognitionEngine {
     private struct CalibrationMeasurement {
         let startedAt: TimeInterval
         let referencePoints: [SIMD2<Float>]
@@ -74,7 +74,7 @@ nonisolated struct WorkoutRecognitionEngine {
 
         func isSteady(_ sample: PushUpSample) -> Bool {
             zip(referencePoints, sample.points).allSatisfy {
-                simd_distance($0, $1) <= RecognitionParameters.calibrationJitter
+                simd_distance($0, $1) <= PushUpRecognitionParameters.calibrationJitter
             }
         }
     }
@@ -105,7 +105,7 @@ nonisolated struct WorkoutRecognitionEngine {
         if let lastTimestamp, frame.timestamp <= lastTimestamp {
             return PushUpRecognitionUpdate(tracking: .findingPosition)
         }
-        if let lastTimestamp, frame.timestamp - lastTimestamp > RecognitionParameters.maximumFrameGap {
+        if let lastTimestamp, frame.timestamp - lastTimestamp > PushUpRecognitionParameters.maximumFrameGap {
             resetTracking()
             self.lastTimestamp = frame.timestamp
             return PushUpRecognitionUpdate(tracking: .findingPosition)
@@ -117,18 +117,18 @@ nonisolated struct WorkoutRecognitionEngine {
             return PushUpRecognitionUpdate(tracking: .cameraMoving)
         }
 
-        let candidates = PoseFeatures.pushUpSamples(from: frame)
+        let candidates = PushUpPose.samples(from: frame)
         if !isTracking {
             return calibrate(candidates, at: frame.timestamp)
         }
 
         var reps: [PushUpRepEvent] = []
         let samplesBySide = Dictionary(uniqueKeysWithValues: candidates.map { ($0.side, $0) })
-        for side in BodyJoint.sides.indices {
+        for side in PushUp.armChains.indices {
             guard let sample = samplesBySide[side] else {
                 let lostAt = armLostAt[side] ?? frame.timestamp
                 armLostAt[side] = lostAt
-                if frame.timestamp - lostAt > RecognitionParameters.armDropoutGraceDuration {
+                if frame.timestamp - lostAt > PushUpRecognitionParameters.armDropoutGraceDuration {
                     detectors.removeValue(forKey: side)
                 }
                 continue
@@ -139,7 +139,7 @@ nonisolated struct WorkoutRecognitionEngine {
             let completed = detector.consume(sample, at: frame.timestamp)
             detectors[side] = detector
             guard completed,
-                  lastRepAt.map({ frame.timestamp - $0 >= RecognitionParameters.armRepDeduplicationDuration }) ?? true else {
+                  lastRepAt.map({ frame.timestamp - $0 >= PushUpRecognitionParameters.armRepDeduplicationDuration }) ?? true else {
                 continue
             }
             nextID += 1
@@ -157,7 +157,7 @@ nonisolated struct WorkoutRecognitionEngine {
 
     private mutating func calibrate(_ candidates: [PushUpSample],
                                     at timestamp: TimeInterval) -> PushUpRecognitionUpdate {
-        let extended = candidates.filter { $0.angle >= RecognitionParameters.minimumRecoveryAngle }
+        let extended = candidates.filter { $0.angle >= PushUpRecognitionParameters.minimumRecoveryAngle }
         let visibleSides = Set(extended.map(\.side))
         for side in Array(calibrations.keys) where !visibleSides.contains(side) {
             calibrations.removeValue(forKey: side)
@@ -177,7 +177,7 @@ nonisolated struct WorkoutRecognitionEngine {
                                            armAngles: angles(from: candidates))
         }
         guard calibrations.values.contains(where: {
-            timestamp - $0.startedAt >= RecognitionParameters.calibrationDuration
+            timestamp - $0.startedAt >= PushUpRecognitionParameters.calibrationDuration
         }) else {
             return PushUpRecognitionUpdate(tracking: .validatingPosition,
                                            armAngles: angles(from: candidates))
