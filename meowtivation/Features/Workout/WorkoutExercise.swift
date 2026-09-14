@@ -59,7 +59,7 @@ nonisolated struct WorkoutRecognitionUpdate: Sendable {
     var reps: [WorkoutRepEvent] = []
 }
 
-private nonisolated extension PushUpTrackingState {
+nonisolated extension PushUpTrackingState {
     var workoutState: WorkoutTrackingState {
         switch self {
         case .findingPosition: .findingPosition
