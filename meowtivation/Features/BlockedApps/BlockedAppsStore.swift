@@ -313,14 +313,16 @@ extension BlockedAppsStore {
         isCafeOpen = DailyBlocking.hasCompletedDailyWorkout(in: defaults, now: date, calendar: calendar) && !isLocked
         DailyBlocking.apply(selection: selection, isLocked: isLocked, to: managedSettings)
         let durationMilliseconds = WorkoutDebugLog.elapsedMilliseconds(since: startedAt)
+        let lockState = isLocked
+        let cafeOpen = isCafeOpen
         WorkoutDebugLog.lifecycle.info(
             "BlockedAppsStore refreshLockState finished; durationMs=\(durationMilliseconds, privacy: .public)"
         )
         WorkoutDebugLog.lifecycle.info(
-            "BlockedAppsStore refreshLockState state; locked=\(isLocked, privacy: .public)"
+            "BlockedAppsStore refreshLockState state; locked=\(lockState, privacy: .public)"
         )
         WorkoutDebugLog.lifecycle.info(
-            "BlockedAppsStore refreshLockState finished; cafeOpen=\(isCafeOpen, privacy: .public)"
+            "BlockedAppsStore refreshLockState finished; cafeOpen=\(cafeOpen, privacy: .public)"
         )
     }
 }

@@ -247,7 +247,7 @@ struct LandingView: View {
 
 private extension LandingView {
     @ViewBuilder
-    var landingCardContainer: some View {
+    private var landingCardContainer: some View {
         if dynamicTypeSize.isAccessibilitySize {
             ScrollView {
                 landingCard
@@ -262,7 +262,7 @@ private extension LandingView {
         }
     }
 
-    var landingCard: some View {
+    private var landingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(blockingStatus.title, systemImage: blockingStatus.symbol)
                 .font(.headline)
@@ -332,12 +332,12 @@ private extension LandingView {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    func resetTapProgress() {
+    private func resetTapProgress() {
         tapProgress = []
         lastTap = nil
     }
 
-    func handleCornerTap(_ side: TapSide) {
+    private func handleCornerTap(_ side: TapSide) {
         guard isLandingVisible, scenePhase == .active, selectedExercise == nil,
               commandError == nil else { return }
         let timestamp = ProcessInfo.processInfo.systemUptime
@@ -366,13 +366,13 @@ private extension LandingView {
         }
     }
 
-    func startWorkout() {
+    private func startWorkout() {
         if let exercise = store.nextRecipeExercise {
             select(exercise, mode: .daily)
         }
     }
 
-    func retryUnlocking() {
+    private func retryUnlocking() {
         do {
             try store.retryDailyWorkoutRecipeCompletion()
         } catch {
@@ -380,13 +380,13 @@ private extension LandingView {
         }
     }
 
-    func select(_ exercise: WorkoutExercise, mode: WorkoutSessionMode) {
+    private func select(_ exercise: WorkoutExercise, mode: WorkoutSessionMode) {
         resetTapProgress()
         selectedWorkoutMode = mode
         selectedExercise = exercise
     }
 
-    func setCafeOpen(_ opens: Bool, animated: Bool) {
+    private func setCafeOpen(_ opens: Bool, animated: Bool) {
         guard opens != showsOpenCafe else { return }
 
         let shouldAnimateOpening = opens && animated && !reduceMotion
@@ -399,7 +399,7 @@ private extension LandingView {
         }
     }
 
-    func cafeImage(named name: String) -> Image {
+    private func cafeImage(named name: String) -> Image {
         guard let image = UIImage(named: name) else { return Image("LandingBackground") }
         return Image(uiImage: image)
     }

@@ -63,8 +63,9 @@ final class WorkoutSessionModel: ObservableObject {
 
     func pause() {
         let wasActive = active
+        let wasEnded = hasEnded
         WorkoutDebugLog.lifecycle.info(
-            "Session pause requested; active=\(wasActive, privacy: .public), ended=\(hasEnded, privacy: .public)"
+            "Session pause requested; active=\(wasActive, privacy: .public), ended=\(wasEnded, privacy: .public)"
         )
         active = false
         generation += 1
