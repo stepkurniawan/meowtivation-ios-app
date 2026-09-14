@@ -23,28 +23,21 @@ final class MeowtivationUITests: XCTestCase {
     }
 
     @MainActor
-    func testWorkoutChooserOpensTheSelectedExerciseSetup() throws {
+    func testStartWorkoutOpensTheNextExerciseSetup() throws {
         let app = XCUIApplication()
         app.launch()
+
+        XCTAssertTrue(app.staticTexts["No apps selected"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Next: Push-up"].exists)
+        XCTAssertTrue(app.staticTexts["0 of 10 reps today"].exists)
 
         let startWorkout = app.buttons["Start Workout"]
         XCTAssertTrue(startWorkout.waitForExistence(timeout: 2))
         startWorkout.tap()
-        XCTAssertTrue(app.buttons["Push-up"].exists)
-        XCTAssertTrue(app.buttons["Squat"].exists)
-
-        app.buttons["Cancel"].tap()
-        XCTAssertFalse(app.buttons["Push-up"].exists)
-
-        startWorkout.tap()
-        app.buttons["Squat"].tap()
-        XCTAssertTrue(app.staticTexts["Squat setup"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Push-up setup"].waitForExistence(timeout: 2))
 
         app.buttons["Done"].tap()
         XCTAssertTrue(startWorkout.waitForExistence(timeout: 2))
-        startWorkout.tap()
-        app.buttons["Push-up"].tap()
-        XCTAssertTrue(app.staticTexts["Push-up setup"].waitForExistence(timeout: 2))
     }
 
     @MainActor

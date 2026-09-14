@@ -19,6 +19,7 @@ struct WorkoutView: View {
     @State private var lastDeveloperTap: TimeInterval?
     @State private var nextExercise: WorkoutExercise?
     @State private var completionError: String?
+    @ScaledMetric(relativeTo: .largeTitle) private var dailyCountSize = 52
 
     init(exercise: WorkoutExercise) {
         _model = StateObject(wrappedValue: WorkoutSessionModel(exercise: exercise))
@@ -191,16 +192,23 @@ struct WorkoutView: View {
             .accessibilityLabel("Live front camera preview")
     }
 
-    /// A view that displays the workout count, readiness, tracking messages, and optional diagnostics.
+    private var activeDailyTarget: Int {
+        store.dailyWorkoutRecipe.entries.first(where: { $0.exercise == model.exercise })?.target ?? 0
+    }
+
+    /// A view that displays daily progress, tracking messages, and optional diagnostics.
     private var controls: some View {
         VStack(spacing: 12) {
             Text(activeTitle).font(.title2.bold())
-            Text("\(model.repCount)").font(.system(size: 64, weight: .bold, design: .rounded))
-                .monospacedDigit().accessibilityLabel("\(model.repCount) repetitions")
-            Image(systemName: model.poseReady ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .font(.title2)
-                .foregroundStyle(model.poseReady ? .green : .red)
-                .accessibilityLabel(model.poseReady ? "Pose ready" : "Pose not ready")
+            Text("Today")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text("\(store.completedRepetitions(for: model.exercise)) / \(activeDailyTarget)")
+                .font(.system(size: dailyCountSize, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .accessibilityLabel(
+                    "\(store.completedRepetitions(for: model.exercise)) of \(activeDailyTarget) daily repetitions"
+                )
             Text(model.tracking.message(for: model.exercise)).font(.callout).multilineTextAlignment(.center)
             if model.startCueVisible {
                 Text("Start!").font(.title.bold()).foregroundStyle(.green)
@@ -209,7 +217,6 @@ struct WorkoutView: View {
             if model.tracking == .findingPosition || model.tracking == .waitingForJoints {
                 Text(model.exercise.placement).font(.caption).foregroundStyle(.secondary)
             }
-            countCard
             if developerMode {
                 Text(String(format: "%.1f fps · %.0f ms · %d usable joints", model.analysisFPS,
                             model.processingMilliseconds,
@@ -247,11 +254,12 @@ struct WorkoutView: View {
         }
     }
 
-    /// A view that displays the workout count.
+    /// A view that displays the count for the completed session.
     private var countCard: some View {
         VStack {
+            Text("This session").font(.caption).foregroundStyle(.secondary)
             Text("\(model.repCount)").font(.title3.bold()).monospacedDigit()
-            Text(activeTitle).font(.caption)
+            Text("\(activeTitle) reps").font(.caption)
         }
         .frame(maxWidth: .infinity)
         .padding()
@@ -293,7 +301,7 @@ struct WorkoutView: View {
 
     private var dailyProgress: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(store.dailyRecipe.entries) { entry in
+            ForEach(store.dailyWorkoutRecipe.entries) { entry in
                 if entry.isEnabled {
                     Text("\(entry.exercise.title): \(store.completedRepetitions(for: entry.exercise))/\(entry.target)")
                         .monospacedDigit()
@@ -322,7 +330,7 @@ struct WorkoutView: View {
 
     private func retryCompletion() {
         do {
-            try store.retryDailyRecipeCompletion()
+            try store.retryDailyWorkoutRecipeCompletion()
             completionError = nil
         } catch {
             completionError = error.localizedDescription

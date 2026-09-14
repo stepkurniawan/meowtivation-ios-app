@@ -5,6 +5,7 @@
 //  Created by stephen on 01.09.26.
 //
 
+import FamilyControls
 import SwiftUI
 import UIKit
 
@@ -25,6 +26,7 @@ struct LandingView: View {
     @EnvironmentObject private var store: BlockedAppsStore
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var tapProgress: [TapSide] = []
     @State private var lastTap: TimeInterval?
     @State private var statusMessage: String?
@@ -35,65 +37,18 @@ struct LandingView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                cafeBackground
+            GeometryReader { geometry in
+                ZStack {
+                    cafeBackground
 
-                Color.black.opacity(0.12)
-                    .ignoresSafeArea()
+                    Color.black.opacity(0.12)
+                        .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    HStack {
-                        NavigationLink {
-                            DailyWorkoutSettingsView()
-                        } label: {
-                            Image(systemName: "gearshape.fill")
-                                .font(.title3.weight(.semibold))
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.primary)
-                        .accessibilityLabel("Settings")
-
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-
-                    Spacer(minLength: 24)
-
-                    Text("meowtivation")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-
-                    Spacer(minLength: 24)
-
-                    Button {
-                        startWorkout()
-                    } label: {
-                        Label("Start Workout", systemImage: "figure.strengthtraining.traditional")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
+                    landingContent(isLandscape: geometry.size.width > geometry.size.height)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: geometry.size.width, height: geometry.size.height)
                 .background(alignment: .bottom) {
-                    HStack(spacing: 0) {
-                        Color.clear
-                            .frame(width: 96, height: 96)
-                            .contentShape(Rectangle())
-                            .onTapGesture { handleCornerTap(.left) }
-                        Spacer()
-                        Color.clear
-                            .frame(width: 96, height: 96)
-                            .contentShape(Rectangle())
-                            .onTapGesture { handleCornerTap(.right) }
-                    }
-                    .ignoresSafeArea(.container, edges: .bottom)
-                    .accessibilityHidden(true)
+                    developerTapTargets
                 }
             }
             .onAppear {
@@ -153,6 +108,184 @@ struct LandingView: View {
         lastTap = nil
     }
 
+    private var hasBlockedApps: Bool {
+        !store.selection.applicationTokens.isEmpty
+            || !store.selection.categoryTokens.isEmpty
+            || !store.selection.webDomainTokens.isEmpty
+    }
+
+    private var nextTarget: DailyExerciseTarget? {
+        guard let exercise = store.nextRecipeExercise else { return nil }
+        return store.dailyWorkoutRecipe.entries.first { $0.exercise == exercise }
+    }
+
+    private var needsUnlockRetry: Bool {
+        !store.hasCompletedDailyWorkout && store.isDailyWorkoutRecipeDone
+    }
+
+    private var blockingStatus: (title: String, symbol: String, tint: Color) {
+        if !hasBlockedApps {
+            return ("No apps selected", "lock.open", .secondary)
+        }
+        if store.isLocked {
+            return ("Apps are blocked", "lock.fill", .primary)
+        }
+        return ("Apps unlocked for today", "lock.open.fill", .green)
+    }
+
+    @ViewBuilder
+    private func landingContent(isLandscape: Bool) -> some View {
+        if isLandscape {
+            VStack(spacing: 0) {
+                settingsLink
+                Spacer(minLength: 8)
+                HStack(spacing: 24) {
+                    titleView
+                    Spacer(minLength: 0)
+                    landingCardContainer
+                        .frame(maxWidth: 460)
+                }
+                .padding(.horizontal, 24)
+                Spacer(minLength: 8)
+            }
+        } else {
+            VStack(spacing: 0) {
+                settingsLink
+                Spacer(minLength: 24)
+                titleView
+                Spacer(minLength: 24)
+                landingCardContainer
+            }
+        }
+    }
+
+    private var settingsLink: some View {
+        HStack {
+            NavigationLink {
+                DailyWorkoutSettingsView()
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.bordered)
+            .tint(.primary)
+            .accessibilityLabel("Settings")
+
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+    }
+
+    private var titleView: some View {
+        Text("meowtivation")
+            .font(.largeTitle.bold())
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(.regularMaterial, in: Capsule())
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var developerTapTargets: some View {
+        HStack(spacing: 0) {
+            Color.clear
+                .frame(width: 96, height: 96)
+                .contentShape(Rectangle())
+                .onTapGesture { handleCornerTap(.left) }
+            Spacer()
+            Color.clear
+                .frame(width: 96, height: 96)
+                .contentShape(Rectangle())
+                .onTapGesture { handleCornerTap(.right) }
+        }
+        .ignoresSafeArea(.container, edges: .bottom)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var landingCardContainer: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            ScrollView {
+                landingCard
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 12)
+            }
+            .frame(maxWidth: 560)
+        } else {
+            landingCard
+                .padding(.horizontal, 24)
+                .padding(.bottom, 12)
+        }
+    }
+
+    private var landingCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(blockingStatus.title, systemImage: blockingStatus.symbol)
+                .font(.headline)
+                .foregroundStyle(blockingStatus.tint)
+
+            if !hasBlockedApps {
+                Text("Choose apps in Settings to block them until today’s workout is complete.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                NavigationLink {
+                    DailyWorkoutSettingsView()
+                } label: {
+                    Label("Choose Blocked Apps", systemImage: "gearshape")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if let nextTarget {
+                Text("Next: \(nextTarget.exercise.title)")
+                    .font(.title3.bold())
+                Text("\(store.completedRepetitions(for: nextTarget.exercise)) of \(nextTarget.target) reps today")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                Button {
+                    startWorkout()
+                } label: {
+                    Label("Start Workout", systemImage: "figure.strengthtraining.traditional")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            } else if needsUnlockRetry {
+                Text("Workout complete")
+                    .font(.title3.bold())
+                Text("Retry to unlock your selected apps for today.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Retry Unlocking") {
+                    retryUnlocking()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+            } else if store.isCafeOpen {
+                Label("Cafe open for today", systemImage: "checkmark.circle.fill")
+                    .font(.title3.bold())
+                    .foregroundStyle(.green)
+                Text("Today’s recipe is complete. Enjoy your unlocked time.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else if store.hasCompletedDailyWorkout {
+                Text("Workout complete")
+                    .font(.title3.bold())
+                Text("Today’s recipe is complete. App blocking is still active.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: 560, alignment: .leading)
+        .padding(20)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
     private func handleCornerTap(_ side: TapSide) {
         guard isLandingVisible, scenePhase == .active, selectedExercise == nil,
               commandError == nil else { return }
@@ -202,10 +335,12 @@ struct LandingView: View {
     private func startWorkout() {
         if let exercise = store.nextRecipeExercise {
             select(exercise)
-            return
         }
+    }
+
+    private func retryUnlocking() {
         do {
-            try store.retryDailyRecipeCompletion()
+            try store.retryDailyWorkoutRecipeCompletion()
         } catch {
             commandError = error.localizedDescription
         }

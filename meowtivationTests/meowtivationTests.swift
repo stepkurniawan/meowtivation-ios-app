@@ -193,8 +193,8 @@ struct MeowtivationTests {
     }
 
     @MainActor
-    @Test func dailyRecipePersistsProgressOrdersExercisesAndResetsTomorrow() throws {
-        let suite = "DailyRecipeTests.\(UUID().uuidString)"
+    @Test func dailyWorkoutRecipePersistsProgressOrdersExercisesAndResetsTomorrow() throws {
+        let suite = "DailyWorkoutRecipeTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         var calendar = Calendar(identifier: .gregorian)
@@ -202,8 +202,8 @@ struct MeowtivationTests {
         var now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 14, hour: 12)))
         let store = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
 
-        #expect(store.dailyRecipe.entries.map(\.exercise) == [.pushUp, .squat])
-        #expect(store.dailyRecipe.entries.map(\.target) == [10, 20])
+        #expect(store.dailyWorkoutRecipe.entries.map(\.exercise) == [.pushUp, .squat])
+        #expect(store.dailyWorkoutRecipe.entries.map(\.target) == [10, 20])
         store.setTarget(1, for: .pushUp)
         store.setTarget(1, for: .squat)
 
@@ -226,30 +226,57 @@ struct MeowtivationTests {
     }
 
     @MainActor
-    @Test func recipeEditsApplyBeforeCompletionButNotAfter() throws {
-        let suite = "DailyRecipeTests.\(UUID().uuidString)"
+    @Test func recipeEditsApplyBeforeCompletionAndQueueForTomorrowAfterward() throws {
+        let suite = "DailyWorkoutRecipeTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let store = BlockedAppsStore(defaults: defaults, startMonitoring: {})
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        var now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 14, hour: 12)))
+        let store = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
 
         store.setExercise(.squat, isEnabled: false)
         store.setTarget(1, for: .pushUp)
-        #expect(store.dailyRecipe.entries.first(where: { $0.exercise == .squat })?.isEnabled == false)
+        #expect(store.dailyWorkoutRecipe.entries.first(where: { $0.exercise == .squat })?.isEnabled == false)
         store.setExercise(.pushUp, isEnabled: false)
-        #expect(store.dailyRecipe.entries.first(where: { $0.exercise == .pushUp })?.isEnabled == true)
+        #expect(store.dailyWorkoutRecipe.entries.first(where: { $0.exercise == .pushUp })?.isEnabled == true)
         store.moveRecipe(from: IndexSet(integer: 1), to: 0)
-        #expect(store.dailyRecipe.entries.map(\.exercise) == [.squat, .pushUp])
+        #expect(store.dailyWorkoutRecipe.entries.map(\.exercise) == [.squat, .pushUp])
 
         try store.recordRecognizedRep(for: .pushUp)
         #expect(store.hasCompletedDailyWorkout)
         store.setTarget(99, for: .pushUp)
-        #expect(store.dailyRecipe.entries.first(where: { $0.exercise == .pushUp })?.target == 1)
+        store.setExercise(.pushUp, isEnabled: false)
+        #expect(store.recipeForSettings.entries.first(where: { $0.exercise == .pushUp })?.isEnabled == true)
+        store.setExercise(.squat, isEnabled: true)
+        store.moveRecipe(from: IndexSet(integer: 1), to: 0)
+
+        #expect(store.dailyWorkoutRecipe.entries.first(where: { $0.exercise == .pushUp })?.target == 1)
+        #expect(store.recipeForSettings.entries.map(\.exercise) == [.pushUp, .squat])
+        #expect(store.recipeForSettings.entries.first(where: { $0.exercise == .pushUp })?.target == 99)
+        #expect(store.recipeForSettings.entries.first(where: { $0.exercise == .squat })?.isEnabled == true)
+        #expect(store.isCafeOpen)
+
+        let reopened = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
+        #expect(reopened.dailyWorkoutRecipe.entries.first(where: { $0.exercise == .pushUp })?.target == 1)
+        #expect(reopened.recipeForSettings.entries.first(where: { $0.exercise == .pushUp })?.target == 99)
+        #expect(reopened.hasCompletedDailyWorkout && reopened.isCafeOpen)
+
+        now = now.addingTimeInterval(24 * 60 * 60)
+        reopened.refreshLockState()
+        #expect(reopened.dailyWorkoutRecipe.entries.map(\.exercise) == [.pushUp, .squat])
+        #expect(reopened.dailyWorkoutRecipe.entries.first(where: { $0.exercise == .pushUp })?.target == 99)
+        #expect(reopened.dailyWorkoutRecipe.entries.first(where: { $0.exercise == .squat })?.isEnabled == true)
+        #expect(reopened.recipeForSettings == reopened.dailyWorkoutRecipe)
+        #expect(reopened.completedRepetitions(for: .pushUp) == 0)
+        #expect(reopened.nextRecipeExercise == .pushUp)
+        #expect(!reopened.hasCompletedDailyWorkout && !reopened.isCafeOpen)
     }
 
     @MainActor
     @Test func failedRecipeUnlockKeepsCafeClosedUntilRetrySucceeds() throws {
         enum ScheduleError: Error { case unavailable }
-        let suite = "DailyRecipeTests.\(UUID().uuidString)"
+        let suite = "DailyWorkoutRecipeTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         var fails = true
@@ -266,13 +293,13 @@ struct MeowtivationTests {
         #expect(store.isLocked && !store.isCafeOpen)
 
         fails = false
-        try store.retryDailyRecipeCompletion()
+        try store.retryDailyWorkoutRecipeCompletion()
         #expect(!store.isLocked && store.isCafeOpen)
     }
 
     @MainActor
     @Test func developerUnlockDoesNotOpenCafeAndDeveloperBlockClosesIt() throws {
-        let suite = "DailyRecipeTests.\(UUID().uuidString)"
+        let suite = "DailyWorkoutRecipeTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = BlockedAppsStore(defaults: defaults, startMonitoring: {}, authorizationCheck: { true })

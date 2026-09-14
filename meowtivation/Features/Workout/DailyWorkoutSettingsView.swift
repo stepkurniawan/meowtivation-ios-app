@@ -7,9 +7,9 @@ struct DailyWorkoutSettingsView: View {
         List {
             Section {
                 if store.hasCompletedDailyWorkout {
-                    Label("Today’s recipe is complete", systemImage: "checkmark.circle.fill")
+                    Label("Editing tomorrow’s recipe", systemImage: "calendar.badge.clock")
                         .foregroundStyle(.green)
-                    Text("You can change this recipe again tomorrow.")
+                    Text("Takes effect tomorrow. Today’s completed recipe stays unchanged.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else {
@@ -22,7 +22,7 @@ struct DailyWorkoutSettingsView: View {
             }
 
             Section {
-                ForEach(store.dailyRecipe.entries) { entry in
+                ForEach(store.recipeForSettings.entries) { entry in
                     exerciseRow(entry)
                 }
                 .onMove(perform: store.moveRecipe)
@@ -48,7 +48,6 @@ struct DailyWorkoutSettingsView: View {
                 get: { entry.isEnabled },
                 set: { store.setExercise(entry.exercise, isEnabled: $0) }
             ))
-            .disabled(store.hasCompletedDailyWorkout)
 
             Stepper(value: Binding(
                 get: { entry.target },
@@ -57,11 +56,13 @@ struct DailyWorkoutSettingsView: View {
                 Text("Target: \(entry.target) reps")
                     .monospacedDigit()
             }
-            .disabled(store.hasCompletedDailyWorkout || !entry.isEnabled)
+            .disabled(!entry.isEnabled)
 
-            Text("Today: \(store.completedRepetitions(for: entry.exercise))/\(entry.target)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            if !store.hasCompletedDailyWorkout {
+                Text("Today: \(store.completedRepetitions(for: entry.exercise))/\(entry.target)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
     }
