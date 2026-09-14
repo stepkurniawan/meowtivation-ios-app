@@ -593,4 +593,17 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
         #expect(camera.configuredJointSets == [Squat.trackedJoints])
         #expect(speech.spoken == ["Start!", "Squat. 1"])
     }
+
+    @Test func sessionCanPrepareTheNextRecipeExerciseWithoutReplacingTheCamera() {
+        let camera = TestWorkoutCamera(), speech = TestWorkoutSpeech()
+        let model = WorkoutSessionModel(exercise: .pushUp, speech: speech, cameraFactory: { _, _ in camera })
+        model.start()
+        model.prepareForNextExercise(.squat)
+
+        #expect(model.exercise == .squat)
+        #expect(!model.hasStarted && !model.hasEnded)
+        #expect(model.repCount == 0)
+        #expect(camera.configuredJointSets == [PushUp.trackedJoints, Squat.trackedJoints])
+        #expect(camera.stops == 1)
+    }
 }

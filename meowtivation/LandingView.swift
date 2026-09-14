@@ -24,23 +24,19 @@ struct LandingView: View {
 
     @EnvironmentObject private var store: BlockedAppsStore
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var tapProgress: [TapSide] = []
     @State private var lastTap: TimeInterval?
     @State private var statusMessage: String?
     @State private var commandError: String?
     @State private var isLandingVisible = false
-    @State private var isWorkoutChooserVisible = false
     @State private var selectedExercise: WorkoutExercise?
+    @State private var showsOpenCafe = false
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Replace LandingBackground.png in the image set to use a custom photo.
-                Image("LandingBackground")
-                    .resizable()
-                    .scaledToFill()
-                    .ignoresSafeArea()
-                    .accessibilityHidden(true)
+                cafeBackground
 
                 Color.black.opacity(0.12)
                     .ignoresSafeArea()
@@ -48,7 +44,7 @@ struct LandingView: View {
                 VStack(spacing: 0) {
                     HStack {
                         NavigationLink {
-                            BlockedAppsView()
+                            DailyWorkoutSettingsView()
                         } label: {
                             Image(systemName: "gearshape.fill")
                                 .font(.title3.weight(.semibold))
@@ -72,7 +68,7 @@ struct LandingView: View {
                     Spacer(minLength: 24)
 
                     Button {
-                        isWorkoutChooserVisible = true
+                        startWorkout()
                     } label: {
                         Label("Start Workout", systemImage: "figure.strengthtraining.traditional")
                             .font(.headline)
@@ -82,23 +78,6 @@ struct LandingView: View {
                     .controlSize(.large)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 12)
-
-                    if isWorkoutChooserVisible {
-                        VStack(spacing: 10) {
-                            workoutChoice(.pushUp,
-                                          title: "Push-up",
-                                          symbol: "figure.strengthtraining.traditional")
-                            workoutChoice(.squat,
-                                          title: "Squat",
-                                          symbol: "figure.strengthtraining.functional")
-                            Button("Cancel", role: .cancel) {
-                                isWorkoutChooserVisible = false
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 12)
-                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(alignment: .bottom) {
@@ -117,13 +96,20 @@ struct LandingView: View {
                     .accessibilityHidden(true)
                 }
             }
-            .onAppear { isLandingVisible = true }
+            .onAppear {
+                isLandingVisible = true
+                showsOpenCafe = store.isCafeOpen
+            }
             .onDisappear {
                 isLandingVisible = false
                 resetTapProgress()
             }
             .onChange(of: scenePhase) { _, _ in resetTapProgress() }
             .onChange(of: selectedExercise) { _, _ in resetTapProgress() }
+            .onChange(of: store.isCafeOpen) { _, opens in
+                guard selectedExercise == nil else { return }
+                setCafeOpen(opens, animated: opens)
+            }
             .onChange(of: commandError) { _, _ in resetTapProgress() }
             .overlay(alignment: .bottom) {
                 if let statusMessage {
@@ -155,7 +141,7 @@ struct LandingView: View {
                 Text(commandError ?? "Unable to change restrictions.")
             }
             .fullScreenCover(item: $selectedExercise, onDismiss: {
-                isWorkoutChooserVisible = false
+                setCafeOpen(store.isCafeOpen, animated: store.isCafeOpen)
             }) { exercise in
                 WorkoutView(exercise: exercise)
             }
@@ -196,22 +182,53 @@ struct LandingView: View {
         }
     }
 
-    private func workoutChoice(_ exercise: WorkoutExercise, title: String, symbol: String) -> some View {
-        Button {
-            select(exercise)
-        } label: {
-            Label(title, systemImage: symbol)
-                .font(.headline)
-                .frame(maxWidth: .infinity)
+    private var cafeBackground: some View {
+        ZStack {
+            cafeImage(named: "CatCafeClosed")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .opacity(showsOpenCafe ? 0 : 1)
+            cafeImage(named: "CatCafeOpen")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .opacity(showsOpenCafe ? 1 : 0)
+                .scaleEffect(showsOpenCafe && !reduceMotion ? 1.02 : 1)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.large)
+        .accessibilityHidden(true)
+    }
+
+    private func startWorkout() {
+        if let exercise = store.nextRecipeExercise {
+            select(exercise)
+            return
+        }
+        do {
+            try store.retryDailyRecipeCompletion()
+        } catch {
+            commandError = error.localizedDescription
+        }
     }
 
     private func select(_ exercise: WorkoutExercise) {
         resetTapProgress()
-        isWorkoutChooserVisible = false
         selectedExercise = exercise
+    }
+
+    private func setCafeOpen(_ opens: Bool, animated: Bool) {
+        if animated, !reduceMotion {
+            withAnimation(.easeInOut(duration: 0.7)) {
+                showsOpenCafe = opens
+            }
+        } else {
+            showsOpenCafe = opens
+        }
+    }
+
+    private func cafeImage(named name: String) -> Image {
+        guard let image = UIImage(named: name) else { return Image("LandingBackground") }
+        return Image(uiImage: image)
     }
 }
 

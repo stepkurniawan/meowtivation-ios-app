@@ -191,4 +191,101 @@ struct MeowtivationTests {
         #expect(!store.isLocked && store.monitoringError == nil)
         #expect(defaults.object(forKey: DailyBlocking.workoutCompletionKey) == nil)
     }
+
+    @MainActor
+    @Test func dailyRecipePersistsProgressOrdersExercisesAndResetsTomorrow() throws {
+        let suite = "DailyRecipeTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        var now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 14, hour: 12)))
+        let store = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
+
+        #expect(store.dailyRecipe.entries.map(\.exercise) == [.pushUp, .squat])
+        #expect(store.dailyRecipe.entries.map(\.target) == [10, 20])
+        store.setTarget(1, for: .pushUp)
+        store.setTarget(1, for: .squat)
+
+        try store.recordRecognizedRep(for: .pushUp)
+        #expect(store.completedRepetitions(for: .pushUp) == 1)
+        #expect(store.nextRecipeExercise == .squat)
+        #expect(!store.hasCompletedDailyWorkout)
+
+        let reopened = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
+        #expect(reopened.completedRepetitions(for: .pushUp) == 1)
+        try reopened.recordRecognizedRep(for: .squat)
+        #expect(reopened.hasCompletedDailyWorkout)
+        #expect(reopened.isCafeOpen)
+
+        now = now.addingTimeInterval(24 * 60 * 60)
+        reopened.refreshLockState()
+        #expect(reopened.completedRepetitions(for: .pushUp) == 0)
+        #expect(reopened.nextRecipeExercise == .pushUp)
+        #expect(!reopened.isCafeOpen)
+    }
+
+    @MainActor
+    @Test func recipeEditsApplyBeforeCompletionButNotAfter() throws {
+        let suite = "DailyRecipeTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = BlockedAppsStore(defaults: defaults, startMonitoring: {})
+
+        store.setExercise(.squat, isEnabled: false)
+        store.setTarget(1, for: .pushUp)
+        #expect(store.dailyRecipe.entries.first(where: { $0.exercise == .squat })?.isEnabled == false)
+        store.setExercise(.pushUp, isEnabled: false)
+        #expect(store.dailyRecipe.entries.first(where: { $0.exercise == .pushUp })?.isEnabled == true)
+        store.moveRecipe(from: IndexSet(integer: 1), to: 0)
+        #expect(store.dailyRecipe.entries.map(\.exercise) == [.squat, .pushUp])
+
+        try store.recordRecognizedRep(for: .pushUp)
+        #expect(store.hasCompletedDailyWorkout)
+        store.setTarget(99, for: .pushUp)
+        #expect(store.dailyRecipe.entries.first(where: { $0.exercise == .pushUp })?.target == 1)
+    }
+
+    @MainActor
+    @Test func failedRecipeUnlockKeepsCafeClosedUntilRetrySucceeds() throws {
+        enum ScheduleError: Error { case unavailable }
+        let suite = "DailyRecipeTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var fails = true
+        let store = BlockedAppsStore(defaults: defaults, startMonitoring: {
+            if fails {
+                throw ScheduleError.unavailable
+            }
+        })
+        store.setExercise(.squat, isEnabled: false)
+        store.setTarget(1, for: .pushUp)
+
+        #expect(throws: ScheduleError.self) { try store.recordRecognizedRep(for: .pushUp) }
+        #expect(store.completedRepetitions(for: .pushUp) == 1)
+        #expect(store.isLocked && !store.isCafeOpen)
+
+        fails = false
+        try store.retryDailyRecipeCompletion()
+        #expect(!store.isLocked && store.isCafeOpen)
+    }
+
+    @MainActor
+    @Test func developerUnlockDoesNotOpenCafeAndDeveloperBlockClosesIt() throws {
+        let suite = "DailyRecipeTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = BlockedAppsStore(defaults: defaults, startMonitoring: {}, authorizationCheck: { true })
+
+        try store.setDeveloperLockOverride(isLocked: false)
+        #expect(!store.isLocked && !store.isCafeOpen)
+
+        store.setExercise(.squat, isEnabled: false)
+        store.setTarget(1, for: .pushUp)
+        try store.recordRecognizedRep(for: .pushUp)
+        #expect(store.isCafeOpen)
+
+        try store.setDeveloperLockOverride(isLocked: true)
+        #expect(store.isLocked && !store.isCafeOpen)
+    }
 }

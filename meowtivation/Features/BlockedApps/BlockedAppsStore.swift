@@ -119,7 +119,13 @@ final class BlockedAppsStore: ObservableObject {
 
     func moveRecipe(from source: IndexSet, to destination: Int) {
         guard !hasCompletedDailyWorkout else { return }
-        dailyRecipe.entries.move(fromOffsets: source, toOffset: destination)
+        let moved = source.map { dailyRecipe.entries[$0] }
+        var remaining = dailyRecipe.entries.enumerated().compactMap { index, entry in
+            source.contains(index) ? nil : entry
+        }
+        let insertionIndex = destination - source.filter { $0 < destination }.count
+        remaining.insert(contentsOf: moved, at: insertionIndex)
+        dailyRecipe.entries = remaining
         saveRecipe()
     }
 
