@@ -9,11 +9,9 @@ final class WorkoutSessionModel: ObservableObject {
     @Published private(set) var poseReady = false
     @Published private(set) var tracking = WorkoutTrackingState.findingPosition
     @Published private(set) var selectedExercise: WorkoutExercise?
-    @Published private(set) var suggestedExercise: WorkoutExercise?
     @Published private(set) var cameraState = WorkoutCameraState.idle
     @Published private(set) var latestFrame: PoseFrame?
     @Published private(set) var armAngles: [Int: Float] = [:]
-    @Published private(set) var kneeAngles: [Int: Float] = [:]
     @Published private(set) var processingMilliseconds = 0.0
     @Published private(set) var analysisFPS = 0.0
     @Published private(set) var hasStarted = false
@@ -21,7 +19,7 @@ final class WorkoutSessionModel: ObservableObject {
     @Published private(set) var isMuted = false
     @Published private(set) var startCueVisible = false
 
-    private var engine = AutomaticWorkoutRecognitionEngine()
+    private var engine = PushUpRecognitionEngine()
     private var lastCreditedID: UInt64 = 0
     private var lastPromptAt = -Double.infinity
     private var lastFrameAt: Double?
@@ -42,7 +40,7 @@ final class WorkoutSessionModel: ObservableObject {
 
     init(speech: (any WorkoutSpeaking)? = nil,
          cameraFactory: (@escaping @Sendable (Int, WorkoutCameraEvent) -> Void) -> any WorkoutCameraControlling = {
-             WorkoutCamera(configuration: .automatic, onEvent: $0)
+             WorkoutCamera(configuration: PushUp.poseConfiguration, onEvent: $0)
          })
     {
         self.speech = speech ?? WorkoutSpeech()
@@ -110,9 +108,8 @@ final class WorkoutSessionModel: ObservableObject {
     private func resetPublishedTracking() {
         poseReady = false
         tracking = .findingPosition
-        suggestedExercise = selectedExercise
+        selectedExercise = .pushUp
         armAngles = [:]
-        kneeAngles = [:]
         startCueVisible = false
         startCueUntil = -Double.infinity
     }
@@ -143,17 +140,11 @@ final class WorkoutSessionModel: ObservableObject {
             processingMilliseconds = milliseconds
             latestFrame = frame
 
-            let previousSelection = selectedExercise
             let update = engine.consume(frame)
             poseReady = update.poseReady
-            tracking = update.tracking
-            selectedExercise = update.selectedExercise ?? engine.selectedExercise
-            suggestedExercise = update.suggestedExercise ?? selectedExercise
-            if previousSelection != selectedExercise, let selectedExercise {
-                camera.updatePoseConfiguration(selectedExercise.poseConfiguration)
-            }
+            tracking = update.tracking.workoutState
+            selectedExercise = .pushUp
             armAngles = update.armAngles
-            kneeAngles = update.kneeAngles
             startCueVisible = frame.timestamp < startCueUntil
             if update.didStart {
                 startCueUntil = frame.timestamp + 1.5
@@ -172,15 +163,9 @@ final class WorkoutSessionModel: ObservableObject {
                 speech.say("Start!")
                 lastPromptAt = frame.timestamp
             } else if counted {
-                let title = selectedExercise?.title ?? "Workout"
-                speech.say(repCount == 1 ? "\(title). \(repCount)" : "\(repCount)")
+                speech.say(repCount == 1 ? "Push Up. \(repCount)" : "\(repCount)")
                 lastPromptAt = frame.timestamp
-            } else if update.tracking == .ambiguous,
-                      frame.timestamp - lastPromptAt >= 1
-            {
-                speech.say(update.tracking.message)
-                lastPromptAt = frame.timestamp
-            } else if update.tracking == .waitingForJoints || update.tracking == .cameraMoving,
+            } else if update.tracking == .waitingForArm || update.tracking == .cameraMoving,
                       frame.timestamp - lastPromptAt >= 8
             {
                 speech.say(update.tracking.message)

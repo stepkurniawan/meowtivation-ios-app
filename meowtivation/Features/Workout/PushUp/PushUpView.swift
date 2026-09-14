@@ -18,16 +18,16 @@ struct WorkoutView: View {
     @State private var lastDeveloperTap: TimeInterval?
 
     private var activeTitle: String {
-        model.selectedExercise?.title ?? model.suggestedExercise?.title ?? "Push-up or Squat"
+        model.selectedExercise?.title ?? "Push-up"
     }
 
     private var activePlacement: String {
         model.selectedExercise?.placement ??
-            "Keep one person in view. Try either a side-view push-up or a full-body squat."
+            "Keep one person in view with your arms and legs visible."
     }
 
     private var activeConfiguration: WorkoutPoseConfiguration {
-        model.selectedExercise?.poseConfiguration ?? .automatic
+        model.selectedExercise?.poseConfiguration ?? PushUp.poseConfiguration
     }
 
     /// The main view for the workout session. It displays different content based on the state of the workout session
@@ -203,10 +203,6 @@ struct WorkoutView: View {
                 .foregroundStyle(model.poseReady ? .green : .red)
                 .accessibilityLabel(model.poseReady ? "Pose ready" : "Pose not ready")
             Text(model.tracking.message).font(.callout).multilineTextAlignment(.center)
-            if let suggestion = model.suggestedExercise, model.selectedExercise == nil {
-                Text("Suggested: \(suggestion.title). Start moving when you are ready.")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
             if model.startCueVisible {
                 Text("Start!").font(.title.bold()).foregroundStyle(.green)
                     .accessibilityLabel("Start \(activeTitle)")
@@ -220,16 +216,12 @@ struct WorkoutView: View {
                             model.processingMilliseconds,
                             model.latestFrame?.joints.values.filter(\.isUsable).count ?? 0))
                     .font(.caption.monospaced())
-                if !model.armAngles.isEmpty || !model.kneeAngles.isEmpty {
+                if !model.armAngles.isEmpty {
                     let armText = model.armAngles.keys.sorted().compactMap { side -> String? in
                         guard let angle = model.armAngles[side] else { return nil }
                         return "\(side == 0 ? "Right" : "Left"): \(Int(angle))°"
                     }.joined(separator: " · ")
-                    let kneeText = model.kneeAngles.keys.sorted().compactMap { side -> String? in
-                        guard let angle = model.kneeAngles[side] else { return nil }
-                        return "\(side == 0 ? "Right" : "Left"): \(Int(angle))°"
-                    }.joined(separator: " · ")
-                    Text(armText + (kneeText.isEmpty ? "" : "  knees: " + kneeText))
+                    Text(armText)
                         .font(.caption.monospaced())
                 }
                 Text("Green: corroborated joint. Orange: rejected. A returned joint does not prove visibility.")

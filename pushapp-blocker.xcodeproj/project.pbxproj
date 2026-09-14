@@ -67,19 +67,19 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		97FA23C23046F68600A48C8F /* pushapp-blocker */ = {
+		97FA23C23046F68600A48C8F /* meowtivation */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "pushapp-blocker";
+			path = "meowtivation";
 			sourceTree = "<group>";
 		};
-		97FA23D23046F68800A48C8F /* pushapp-blockerTests */ = {
+		97FA23D23046F68800A48C8F /* meowtivationTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "pushapp-blockerTests";
+			path = "meowtivationTests";
 			sourceTree = "<group>";
 		};
-		97FA23DC3046F68800A48C8F /* pushapp-blockerUITests */ = {
+		97FA23DC3046F68800A48C8F /* meowtivationUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "pushapp-blockerUITests";
+			path = "meowtivationUITests";
 			sourceTree = "<group>";
 		};
 		DA1100000000000000000007 /* DailyResetMonitor */ = {
@@ -133,11 +133,11 @@
 			isa = PBXGroup;
 			children = (
 				97FA23EC304817DD00A48C8F /* README.md */,
-				97FA23C23046F68600A48C8F /* pushapp-blocker */,
+				97FA23C23046F68600A48C8F /* meowtivation */,
 				DA1100000000000000000007 /* DailyResetMonitor */,
 				DA1100000000000000000008 /* Shared */,
-				97FA23D23046F68800A48C8F /* pushapp-blockerTests */,
-				97FA23DC3046F68800A48C8F /* pushapp-blockerUITests */,
+				97FA23D23046F68800A48C8F /* meowtivationTests */,
+				97FA23DC3046F68800A48C8F /* meowtivationUITests */,
 				97FA23C13046F68600A48C8F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -171,7 +171,7 @@
 				DA110000000000000000000D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				97FA23C23046F68600A48C8F /* pushapp-blocker */,
+				97FA23C23046F68600A48C8F /* meowtivation */,
 				DA1100000000000000000008 /* Shared */,
 			);
 			name = "pushapp-blocker";
@@ -195,7 +195,7 @@
 				97FA23D13046F68800A48C8F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				97FA23D23046F68800A48C8F /* pushapp-blockerTests */,
+				97FA23D23046F68800A48C8F /* meowtivationTests */,
 			);
 			name = "pushapp-blockerTests";
 			packageProductDependencies = (
@@ -218,7 +218,7 @@
 				97FA23DB3046F68800A48C8F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				97FA23DC3046F68800A48C8F /* pushapp-blockerUITests */,
+				97FA23DC3046F68800A48C8F /* meowtivationUITests */,
 			);
 			name = "pushapp-blockerUITests";
 			packageProductDependencies = (
@@ -519,7 +519,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "pushapp-blocker/pushapp-blocker.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "meowtivation/pushapp-blocker.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K9FT2YTWMF;
@@ -555,7 +555,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "pushapp-blocker/pushapp-blocker.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "meowtivation/pushapp-blocker.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K9FT2YTWMF;

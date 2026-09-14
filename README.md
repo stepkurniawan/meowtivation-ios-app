@@ -190,8 +190,8 @@ websites, lock status, errors, the **Edit** button, and the app picker.
 When the view changes `store.selection`, the store saves the selection and updates
 blocking. SwiftUI refreshes the view when the store's published state changes.
 
-- **Appearance, text, or buttons:** [`BlockedAppsView.swift`](pushapp-blocker/Features/BlockedApps/BlockedAppsView.swift)
-- **Saving selections or blocking/unlocking behavior:** [`BlockedAppsStore.swift`](pushapp-blocker/Features/BlockedApps/BlockedAppsStore.swift)
+- **Appearance, text, or buttons:** [`BlockedAppsView.swift`](meowtivation/Features/BlockedApps/BlockedAppsView.swift)
+- **Saving selections or blocking/unlocking behavior:** [`BlockedAppsStore.swift`](meowtivation/Features/BlockedApps/BlockedAppsStore.swift)
 
 ### Shared daily blocking logic
 
@@ -221,35 +221,35 @@ an Apple requirement.
 The Workout feature keeps reusable camera, pose, and automatic-selection
 infrastructure at its root. Exercise-specific code lives in its own folder.
 
-- [`PushUpView.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpView.swift)
+- [`PushUpView.swift`](meowtivation/Features/Workout/PushUp/PushUpView.swift)
   contains the shared `WorkoutView`, which displays setup guidance, the live camera
   preview, the suggested/selected exercise, the count, tracking status, diagnostics,
   and the completed session summary. It pauses and resumes with scene phase.
-- [`PushUpSessionModel.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpSessionModel.swift)
+- [`PushUpSessionModel.swift`](meowtivation/Features/Workout/PushUp/PushUpSessionModel.swift)
   contains the shared `WorkoutSessionModel`, which coordinates automatic selection,
   session lifecycle, count, camera state, orientation, speech feedback, and published
   view state.
-- [`WorkoutExercise.swift`](pushapp-blocker/Features/Workout/WorkoutExercise.swift)
+- [`WorkoutExercise.swift`](meowtivation/Features/Workout/WorkoutExercise.swift)
   defines exercise metadata, the union camera configuration, shared tracking updates,
   the starting-pose hint, and the automatic coordinator that runs push-up and squat
   engines in parallel until the first valid rep.
-- [`WorkoutCamera.swift`](pushapp-blocker/Features/Workout/WorkoutCamera.swift)
+- [`WorkoutCamera.swift`](meowtivation/Features/Workout/WorkoutCamera.swift)
   owns camera permission, capture, Vision processing, interruptions, runtime
   errors, device rotation, and configured `PoseFrame` delivery.
-- [`WorkoutPose.swift`](pushapp-blocker/Features/Workout/WorkoutPose.swift)
+- [`WorkoutPose.swift`](meowtivation/Features/Workout/WorkoutPose.swift)
   defines shared pose data, geometry, filtering, and the exercise-supplied
   `WorkoutPoseConfiguration`.
-- [`WorkoutPreview.swift`](pushapp-blocker/Features/Workout/WorkoutPreview.swift)
+- [`WorkoutPreview.swift`](meowtivation/Features/Workout/WorkoutPreview.swift)
   draws the configured exercise joints and bones over the live camera preview.
-- [`WorkoutSpeech.swift`](pushapp-blocker/Features/Workout/WorkoutSpeech.swift)
+- [`WorkoutSpeech.swift`](meowtivation/Features/Workout/WorkoutSpeech.swift)
   provides spoken workout feedback.
-- [`PushUp.swift`](pushapp-blocker/Features/Workout/PushUp/PushUp.swift) and
-  [`PushUpPose.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpPose.swift)
+- [`PushUp.swift`](meowtivation/Features/Workout/PushUp/PushUp.swift) and
+  [`PushUpPose.swift`](meowtivation/Features/Workout/PushUp/PushUpPose.swift)
   define the push-up arm chains, camera target, pose samples, and thresholds.
-- [`Squat.swift`](pushapp-blocker/Features/Workout/Squat/Squat.swift) and
-  [`SquatPose.swift`](pushapp-blocker/Features/Workout/Squat/SquatPose.swift)
+- [`Squat.swift`](meowtivation/Features/Workout/Squat/Squat.swift) and
+  [`SquatPose.swift`](meowtivation/Features/Workout/Squat/SquatPose.swift)
   define the squat leg chains, camera target, pose samples, and thresholds.
-- [`PushUpRecognitionEngine.swift`](pushapp-blocker/Features/Workout/PushUp/PushUpRecognitionEngine.swift)
+- [`PushUpRecognitionEngine.swift`](meowtivation/Features/Workout/PushUp/PushUpRecognitionEngine.swift)
   is the pure temporal push-up classifier. It uses stabilized elbow angles,
   detects a stable down-then-up cycle, and reports tracking status and
   repetitions.
