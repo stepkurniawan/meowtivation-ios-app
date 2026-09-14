@@ -6,16 +6,31 @@ nonisolated enum BodyJoint: String, CaseIterable, Codable, Sendable {
     case rightShoulder, rightElbow, rightWrist, rightHip, rightKnee, rightAnkle
 }
 
-nonisolated struct PoseBone: Sendable {
-    let start: BodyJoint
-    let end: BodyJoint
+/// How much of an exercise's required body pose Vision can currently see.
+nonisolated enum WorkoutPoseVisibility: Equatable, Sendable {
+    case none, partial, complete
 }
 
-/// The joint and overlay requirements supplied by one exercise to shared camera and preview code.
+/// The joint requirements supplied by one exercise to shared camera and preview code.
 nonisolated struct WorkoutPoseConfiguration: Sendable {
-    let trackedJoints: [BodyJoint]
-    let bones: [PoseBone]
+    let detectionChains: [[BodyJoint]]
     let cameraTarget: @Sendable ([BodyJoint: PoseJoint]) -> SIMD2<Float>?
+
+    var trackedJoints: [BodyJoint] {
+        detectionChains.flatMap { $0 }
+    }
+
+    /// A complete pose requires every configured chain, so the feedback glow
+    /// only turns green when both arms or both legs are clearly visible.
+    func visibility(in frame: PoseFrame?) -> WorkoutPoseVisibility {
+        guard let frame else { return .none }
+        let isUsable: (BodyJoint) -> Bool = { frame.joints[$0]?.isUsable == true }
+        guard detectionChains.flatMap({ $0 }).contains(where: isUsable) else { return .none }
+        guard !detectionChains.isEmpty,
+              detectionChains.allSatisfy({ chain in !chain.isEmpty && chain.allSatisfy(isUsable) })
+        else { return .partial }
+        return .complete
+    }
 }
 
 /// Shared camera and visual-pose values, pending the physical-device acceptance protocol.

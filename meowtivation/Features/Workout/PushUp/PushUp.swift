@@ -12,12 +12,7 @@ nonisolated enum PushUp {
         [.leftShoulder, .leftElbow, .leftWrist],
     ]
     static let trackedJoints = armChains.flatMap { $0 }
-    static let bones = armChains.flatMap { [
-        PoseBone(start: $0[0], end: $0[1]),
-        PoseBone(start: $0[1], end: $0[2]),
-    ] }
-    static let poseConfiguration = WorkoutPoseConfiguration(trackedJoints: trackedJoints,
-                                                            bones: bones,
+    static let poseConfiguration = WorkoutPoseConfiguration(detectionChains: armChains,
                                                             cameraTarget: { cameraTarget(from: $0) })
 
     /// Returns one arm's image-space centre when Vision sees a reliable push-up arm.

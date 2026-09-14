@@ -240,7 +240,7 @@ infrastructure at its root. Exercise-specific code lives in its own folder.
   defines shared pose data, geometry, filtering, and the exercise-supplied
   `WorkoutPoseConfiguration`.
 - [`WorkoutPreview.swift`](meowtivation/Features/Workout/WorkoutPreview.swift)
-  draws the configured exercise joints and bones over the live camera preview.
+  hosts the live camera preview and keeps it aligned with Vision orientation.
 - [`WorkoutSpeech.swift`](meowtivation/Features/Workout/WorkoutSpeech.swift)
   provides spoken workout feedback.
 - [`PushUp.swift`](meowtivation/Features/Workout/PushUp/PushUp.swift) and

@@ -163,11 +163,9 @@ struct WorkoutView: View {
         }
     }
 
-    /// A view that displays the live camera preview with the detected skeleton overlay and error messages.
+    /// A view that displays the live camera preview, pose-visibility glow, and error messages.
     private var preview: some View {
-        WorkoutPreview(session: model.camera.session, frame: model.latestFrame,
-                       configuration: activeConfiguration,
-                       onRotation: model.updateRotation)
+        WorkoutPreview(session: model.camera.session, onRotation: model.updateRotation)
             .background(.black)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay {
@@ -189,7 +187,20 @@ struct WorkoutView: View {
                     .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 12)).padding()
                 }
             }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(poseGlow, lineWidth: 4)
+                    .shadow(color: poseGlow.opacity(0.8), radius: 12)
+            }
             .accessibilityLabel("Live front camera preview")
+    }
+
+    private var poseGlow: Color {
+        switch activeConfiguration.visibility(in: model.latestFrame) {
+        case .complete: .green
+        case .partial: .orange
+        case .none: .red
+        }
     }
 
     private var activeDailyTarget: Int {
@@ -230,7 +241,7 @@ struct WorkoutView: View {
                     Text(angleText)
                         .font(.caption.monospaced())
                 }
-                Text("Green: corroborated joint. Orange: rejected. A returned joint does not prove visibility.")
+                Text("Glow: green shows both full arms or legs; orange is partial; red has no usable joints.")
                     .font(.caption2)
             }
         }.frame(maxWidth: .infinity)

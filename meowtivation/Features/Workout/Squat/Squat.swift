@@ -13,12 +13,7 @@ nonisolated enum Squat {
     ]
 
     static let trackedJoints = legChains.flatMap { $0 }
-    static let bones = legChains.flatMap { [
-        PoseBone(start: $0[0], end: $0[1]),
-        PoseBone(start: $0[1], end: $0[2]),
-    ] }
-    static let poseConfiguration = WorkoutPoseConfiguration(trackedJoints: trackedJoints,
-                                                            bones: bones,
+    static let poseConfiguration = WorkoutPoseConfiguration(detectionChains: legChains,
                                                             cameraTarget: { joints in
                                                                 for leg in legChains {
                                                                     guard let hip = joints[leg[0]],
