@@ -74,12 +74,22 @@ jobs:
             -enableCodeCoverage YES \
             -resultBundlePath "$RUNNER_TEMP/UnitTests.xcresult" \
             CODE_SIGNING_ALLOWED=NO
+      - name: Verify unit-test result bundle
+        run: test -f "$RUNNER_TEMP/UnitTests.xcresult/Info.plist"
+      - name: Package unit-test result bundle
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/UnitTests.xcresult" ]; then
+            tar -cf "$RUNNER_TEMP/UnitTests.xcresult.tar" \
+              -C "$RUNNER_TEMP" \
+              UnitTests.xcresult
+          fi
       - name: Save unit-test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-results
-          path: ${{ runner.temp }}/UnitTests.xcresult
+          path: ${{ runner.temp }}/UnitTests.xcresult.tar
           if-no-files-found: ignore
           retention-days: 7
 
@@ -111,6 +121,11 @@ jobs:
         with:
           name: unit-test-results
           path: ${{ runner.temp }}/unit-test-results
+      - name: Restore unit-test result bundle
+        run: |
+          tar -xf "$RUNNER_TEMP/unit-test-results/UnitTests.xcresult.tar" \
+            -C "$RUNNER_TEMP/unit-test-results"
+          test -f "$RUNNER_TEMP/unit-test-results/UnitTests.xcresult/Info.plist"
       - name: Report coverage
         run: |
           {
