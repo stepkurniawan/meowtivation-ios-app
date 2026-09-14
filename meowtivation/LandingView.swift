@@ -47,7 +47,7 @@ struct LandingView: View {
                     landingContent(isLandscape: geometry.size.width > geometry.size.height)
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                .background(alignment: .bottom) {
+                .overlay(alignment: .bottom) {
                     developerTapTargets
                 }
             }
