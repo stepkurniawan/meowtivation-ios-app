@@ -1,15 +1,15 @@
 # meowtivation
 App that blocks your distraction apps until you do your daily push up rep. It will cheer you up during your rep and counts for you. 
 
-The app is in swift language using SwiftUI and SwiftData when possible. 
+The app is written in Swift using SwiftUI and native Apple frameworks.
 
 ## Workout recognition
 
-**Start Workout** opens a live, on-device camera session that suggests and counts
-push-ups or squats. It uses Vision's `VNDetectHumanBodyPoseRequest` to extract both
-arm and leg joints. The starting pose is only a hint: the first complete elbow or
-knee-angle rep selects the exercise, becomes rep 1, and locks that exercise for the
-session.
+**Start Workout** opens a live, on-device camera session that counts the selected
+push-up or squat. The user chooses the exercise before the session, and that choice
+stays fixed. It uses Vision's `VNDetectHumanBodyPoseRequest` to extract the required
+arm or leg joints. The starting pose is a readiness hint; the first complete rep
+starts counting.
 
 The app intentionally uses 2D pose observations rather than 3D observations:
 push-up counting only needs the shoulder-elbow-wrist geometry in the camera image,
@@ -30,8 +30,8 @@ AI model. A future Core ML classifier can advise the same session boundary, but 
 completed rep remains the source of truth for locking the workout.
 
 Video is processed locally and is not saved. Spoken workout count
-feedback can be muted. The current feature counts a workout session but does not
-complete or unlock the daily app-blocking requirement.
+feedback can be muted. Completing the daily recipe unlocks the selected apps for
+the current local calendar day.
 
 The iOS Simulator has no usable camera for Vision testing. Validate placements,
 lighting, phone angle, different users, and incorrect starting-pose hints on a
@@ -43,17 +43,17 @@ movements.
 
 The app shares one `BlockedAppsStore` through the SwiftUI environment. Its
 read-only `isLocked` state controls shields for the selected apps, categories,
-and websites. The future workout completion flow should call
-`try completeDailyWorkout()` on that shared store after a successful workout.
-This removes the shields without clearing the selection and saves the completion
-date in shared App Group UserDefaults so the unlock survives app restarts.
+and websites. The workout completion flow calls `try completeDailyWorkout()` on
+that shared store after a successful recipe. This removes the shields without
+clearing the selection and saves the completion date in shared App Group
+UserDefaults so the unlock survives app restarts.
 If registering the daily schedule fails, the method throws and does not grant a
 new unlock. The caller should display that error and allow a retry.
 
 An unlock lasts for the current calendar day in the device's local time zone.
 The state refreshes on launch, foreground activation, and significant time changes
-(including midnight). Workout sessions currently do not verify or complete the
-daily unlock requirement.
+(including midnight). Workout sessions verify each recognized repetition and
+complete the daily unlock requirement after the final enabled target.
 
 `DailyResetMonitor` is an embedded Device Activity extension with a repeating
 midnight-to-midnight schedule. iOS invokes it when the device is used after the
@@ -72,17 +72,23 @@ named Managed Settings store so either can update the shields.
   update both entitlement files and `Shared/DailyBlocking.swift` together.
 - Distribution requires Family Controls entitlement approval for both bundle IDs.
 - On a physical iPhone, grant Screen Time access using **Blocked Apps > Edit**
-  and select a game. Confirm it is blocked, then call `try completeDailyWorkout()`
-  on the shared store through the debugger or the future workout flow. Confirm
-  the game unlocks, close meowtivation, and use the device after local midnight.
-  Open the game directly: it should be shielded without reopening meowtivation.
+  and select a game. Confirm it is blocked, complete the daily workout, and
+  confirm the game unlocks. Close meowtivation, use the device after local
+  midnight, and open the game directly; it should be shielded without reopening
+  meowtivation.
   Repeat after skipping several days and after completing another workout.
 - Unit tests cover shared date/selection reads, skipped days, delayed callbacks,
-  daylight-saving boundaries, migration, and scheduling failures. Actual iOS
-  callback delivery and Screen Time shields require physical-device verification.
+  daylight-saving boundaries, migration, and scheduling failures. The physical
+  device acceptance flow above should be repeated after entitlement or reset changes.
 
 Apple documents delivery on device use, not a guaranteed wall-clock execution
 exactly at midnight: [DeviceActivityCenter](https://developer.apple.com/documentation/deviceactivity/deviceactivitycenter).
+
+### MVP verification status
+
+The P0 personal-device flow has been verified on a physical iPhone: Screen Time
+authorization, app shielding, workout recognition, daily unlock, relaunch
+persistence, and next-day reset all work correctly.
 
 ## Run the app
 
@@ -218,21 +224,22 @@ an Apple requirement.
 
 ### Workout feature
 
-The Workout feature keeps reusable camera, pose, and automatic-selection
-infrastructure at its root. Exercise-specific code lives in its own folder.
+The Workout feature keeps reusable camera and pose infrastructure at its root.
+Exercise-specific code lives in its own folder, and the selected exercise remains
+fixed for each session.
 
 - [`PushUpView.swift`](meowtivation/Features/Workout/PushUp/PushUpView.swift)
   contains the shared `WorkoutView`, which displays setup guidance, the live camera
-  preview, the suggested/selected exercise, the count, tracking status, diagnostics,
+  preview, the selected exercise, the count, tracking status, diagnostics,
   and the completed session summary. It pauses and resumes with scene phase.
 - [`PushUpSessionModel.swift`](meowtivation/Features/Workout/PushUp/PushUpSessionModel.swift)
-  contains the shared `WorkoutSessionModel`, which coordinates automatic selection,
+  contains the shared `WorkoutSessionModel`, which coordinates the fixed exercise,
   session lifecycle, count, camera state, orientation, speech feedback, and published
   view state.
 - [`WorkoutExercise.swift`](meowtivation/Features/Workout/WorkoutExercise.swift)
-  defines exercise metadata, the union camera configuration, shared tracking updates,
-  the starting-pose hint, and the automatic coordinator that runs push-up and squat
-  engines in parallel until the first valid rep.
+  defines exercise metadata, the selected exercise's camera configuration, shared
+  tracking updates, and the routing between the selected exercise and its
+  recognition engine.
 - [`WorkoutCamera.swift`](meowtivation/Features/Workout/WorkoutCamera.swift)
   owns camera permission, capture, Vision processing, interruptions, runtime
   errors, device rotation, and configured `PoseFrame` delivery.
@@ -255,9 +262,8 @@ infrastructure at its root. Exercise-specific code lives in its own folder.
   repetitions.
 
 The view starts the session model, which starts the camera. The camera emits
-events and union-configured pose frames; the model passes each frame to both pure
-recognition engines. The first unambiguous rep selects and locks the exercise,
-updates the shared count, narrows the camera/overlay configuration, and optionally
+events and pose frames for the selected exercise; the model passes each frame to
+that exercise's pure recognition engine, updates the shared count, and optionally
 triggers `WorkoutSpeech`. Recognition has no persistence or blocking dependencies.
 
 For changes, use the exercise view and session model for exercise-specific UI

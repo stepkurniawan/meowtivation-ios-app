@@ -1,6 +1,6 @@
 {
   "name": "sweetpad",
-  "version": "0.2.15",
+  "version": "0.1.8",
   "bspVersion": "2.2.0",
   "languages": [
     "swift",
@@ -10,10 +10,11 @@
     "cpp"
   ],
   "argv": [
-    "/opt/homebrew/bin/sweetpad",
+    "/usr/bin/env",
+    "sweetpad",
     "bsp",
     "serve",
-    "--config",
-    "/Users/steph/.local/state/sweetpad/projects/5b193027f0b0/bsp.json"
+    "--project",
+    "pushapp-blocker.xcodeproj"
   ]
 }
