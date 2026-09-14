@@ -70,7 +70,7 @@ struct BlockedAppsView: View {
         }
         .familyActivityPicker(
             title: "Choose Apps to Block",
-            headerText: "Select the apps and categories you want PushApp Blocker to control.",
+            headerText: "Select the apps and categories you want meowtivation to control.",
             footerText: "You can change this selection at any time.",
             isPresented: $isPickerPresented,
             selection: $store.selection

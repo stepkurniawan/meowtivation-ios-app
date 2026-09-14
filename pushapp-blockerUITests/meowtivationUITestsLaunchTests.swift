@@ -1,13 +1,13 @@
 //
-//  pushapp_blockerUITestsLaunchTests.swift
-//  pushapp-blockerUITests
+//  meowtivationUITestsLaunchTests.swift
+//  meowtivationUITests
 //
 //  Created by stephen on 01.09.26.
 //
 
 import XCTest
 
-final class PushAppBlockerUITestsLaunchTests: XCTestCase {
+final class MeowtivationUITestsLaunchTests: XCTestCase {
     // XCTestCase requires this class-property override for UI configuration.
     // swiftlint:disable:next static_over_final_class
     override class var runsForEachTargetApplicationUIConfiguration: Bool {

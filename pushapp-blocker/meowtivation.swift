@@ -1,6 +1,6 @@
 //
-//  pushapp_blockerApp.swift
-//  pushapp-blocker
+//  meowtivation.swift
+//  meowtivation
 //
 //  Created by stephen on 01.09.26.
 //
@@ -10,7 +10,7 @@ import SwiftUI
 import UIKit
 
 @main
-struct PushAppBlockerApp: App {
+struct MeowtivationApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var blockedAppsStore = BlockedAppsStore()
 

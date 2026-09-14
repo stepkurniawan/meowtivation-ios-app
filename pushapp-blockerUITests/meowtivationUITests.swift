@@ -1,13 +1,13 @@
 //
-//  pushapp_blockerUITests.swift
-//  pushapp-blockerUITests
+//  meowtivationUITests.swift
+//  meowtivationUITests
 //
 //  Created by stephen on 01.09.26.
 //
 
 import XCTest
 
-final class PushAppBlockerUITests: XCTestCase {
+final class MeowtivationUITests: XCTestCase {
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
 

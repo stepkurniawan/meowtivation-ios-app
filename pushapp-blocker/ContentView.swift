@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  pushapp-blocker
+//  meowtivation
 //
 //  Created by stephen on 01.09.26.
 //
@@ -36,7 +36,7 @@ struct ContentView: View {
             VStack(spacing: 24) {
                 Spacer()
 
-                Text("PushApp Blocker")
+                Text("meowtivation")
                     .font(.largeTitle)
                     .fontWeight(.bold)
 

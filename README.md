@@ -1,4 +1,4 @@
-# pushapp-blocker
+# meowtivation
 App that blocks your distraction apps until you do your daily push up rep. It will cheer you up during your rep and counts for you. 
 
 The app is in swift language using SwiftUI and SwiftData when possible. 
@@ -57,7 +57,7 @@ daily unlock requirement.
 
 `DailyResetMonitor` is an embedded Device Activity extension with a repeating
 midnight-to-midnight schedule. iOS invokes it when the device is used after the
-daily boundary, even if PushApp Blocker is closed. It reads the saved selection
+daily boundary, even if meowtivation is closed. It reads the saved selection
 and workout date, then reapplies shields if no workout was completed that day.
 Both interval callbacks check the date; neither blindly unlocks apps or overwrites
 a workout completed before a delayed callback. The app and extension use the same
@@ -74,8 +74,8 @@ named Managed Settings store so either can update the shields.
 - On a physical iPhone, grant Screen Time access using **Blocked Apps > Edit**
   and select a game. Confirm it is blocked, then call `try completeDailyWorkout()`
   on the shared store through the debugger or the future workout flow. Confirm
-  the game unlocks, close PushApp Blocker, and use the device after local midnight.
-  Open the game directly: it should be shielded without reopening PushApp Blocker.
+  the game unlocks, close meowtivation, and use the device after local midnight.
+  Open the game directly: it should be shielded without reopening meowtivation.
   Repeat after skipping several days and after completing another workout.
 - Unit tests cover shared date/selection reads, skipped days, delayed callbacks,
   daylight-saving boundaries, migration, and scheduling failures. Actual iOS

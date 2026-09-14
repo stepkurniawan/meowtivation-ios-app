@@ -1,6 +1,6 @@
 //
-//  pushapp_blockerTests.swift
-//  pushapp-blockerTests
+//  meowtivationTests.swift
+//  meowtivationTests
 //
 //  Created by stephen on 01.09.26.
 //
@@ -10,7 +10,7 @@ import Foundation
 @testable import pushapp_blocker
 import Testing
 
-struct PushAppBlockerTests {
+struct MeowtivationTests {
     @MainActor
     @Test func monitorReadsSavedCompletionWithoutOpeningTheApp() throws {
         let suiteName = "DailyLockTests.\(UUID().uuidString)"
