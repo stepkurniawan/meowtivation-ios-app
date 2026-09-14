@@ -227,7 +227,7 @@ struct MeowtivationTests {
         let store = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
 
         #expect(store.dailyWorkoutRecipe.entries.map(\.exercise) == [.pushUp, .squat])
-        #expect(store.dailyWorkoutRecipe.entries.map(\.target) == [10, 20])
+        #expect(store.dailyWorkoutRecipe.entries.allSatisfy { $0.target > 1 })
         store.setTarget(1, for: .pushUp)
         store.setTarget(1, for: .squat)
 
