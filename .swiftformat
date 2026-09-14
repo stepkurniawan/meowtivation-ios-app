@@ -1,0 +1,18 @@
+# Keep formatting close to the existing project style while using SwiftFormat's
+# stable, conservative defaults for everything else.
+--swift-version 5
+--indent 4
+--maxwidth 120
+--disable docComments,docCommentsBeforeModifiers,hoistTry,redundantThrows,redundantType
+--wraparguments preserve
+--wrapparameters preserve
+--wrapcollections preserve
+--wrapconditions preserve
+--wrapreturntype preserve
+--wrapeffects preserve
+--trimwhitespace always
+--commas always
+--self remove
+--voidtype void
+--semicolons inline
+--linebreaks lf

@@ -19,7 +19,7 @@ struct ContentView: View {
 
     private static let commandSequences: [DeveloperCommand: [TapSide]] = [
         .block: [.left, .right, .left, .right, .left, .left],
-        .unblock: [.left, .right, .left, .right, .right, .right]
+        .unblock: [.left, .right, .left, .right, .right, .right],
     ]
 
     @EnvironmentObject private var store: BlockedAppsStore
@@ -103,11 +103,15 @@ struct ContentView: View {
                 do {
                     try await Task.sleep(for: .seconds(3))
                     statusMessage = nil
-                } catch { }
+                } catch {}
             }
             .alert("App Blocking Failed", isPresented: Binding(
                 get: { commandError != nil },
-                set: { if !$0 { commandError = nil } }
+                set: {
+                    if !$0 {
+                        commandError = nil
+                    }
+                }
             )) {
                 Button("OK", role: .cancel) { commandError = nil }
             } message: {
@@ -128,13 +132,15 @@ struct ContentView: View {
         guard isLandingVisible, scenePhase == .active, !isCameraOpen,
               commandError == nil else { return }
         let timestamp = ProcessInfo.processInfo.systemUptime
-        if let lastTap, timestamp - lastTap > 1.5 { resetTapProgress() }
+        if let lastTap, timestamp - lastTap > 1.5 {
+            resetTapProgress()
+        }
         lastTap = timestamp
         tapProgress.append(side)
         if let command = Self.commandSequences.first(where: { $0.value == tapProgress })?.key {
             resetTapProgress()
             do {
-                try store.setDeveloperLockOverride(isLocked: (command == .block))
+                try store.setDeveloperLockOverride(isLocked: command == .block)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 statusMessage = (command == .block) ? "Selected apps blocked" : "Selected apps unlocked for today"
                 if let error = store.monitoringError {
@@ -146,7 +152,7 @@ struct ContentView: View {
             }
             return
         }
-        while !tapProgress.isEmpty && !Self.commandSequences.values.contains(where: { $0.starts(with: tapProgress) }) {
+        while !tapProgress.isEmpty, !Self.commandSequences.values.contains(where: { $0.starts(with: tapProgress) }) {
             tapProgress.removeFirst()
         }
     }

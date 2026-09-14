@@ -4,6 +4,8 @@ import Foundation
 import ManagedSettings
 
 @MainActor
+// FamilyControls state is published through the existing SwiftUI StateObject integration.
+// swiftlint:disable:next observable_object_legacy
 final class BlockedAppsStore: ObservableObject {
     @Published private(set) var isLocked = true
     @Published private(set) var hasDeveloperOverride = false
@@ -69,7 +71,9 @@ final class BlockedAppsStore: ObservableObject {
 
     func setDeveloperLockOverride(isLocked: Bool) throws {
         guard isAuthorized else { throw DeveloperOverrideError.authorizationRequired }
-        if !isLocked { try ensureDailyReset() }
+        if !isLocked {
+            try ensureDailyReset()
+        }
         let override = DailyBlocking.DeveloperOverride(isLocked: isLocked, date: now())
         defaults.set(try JSONEncoder().encode(override), forKey: DailyBlocking.developerOverrideKey)
         refreshLockState()

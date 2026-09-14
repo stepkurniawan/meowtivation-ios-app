@@ -45,6 +45,17 @@ jobs:
           fi
       - name: Run SwiftLint
         run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging
+      - name: Install SwiftFormat
+        run: |
+          if ! command -v swiftformat >/dev/null 2>&1; then
+            brew install swiftformat
+          fi
+      - name: Check SwiftFormat
+        run: |
+          swiftformat \
+            --lint \
+            --config .swiftformat \
+            $(git ls-files -- '*.swift')
 
   unit-tests:
     name: Unit tests

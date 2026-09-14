@@ -93,6 +93,28 @@ exactly at midnight: [DeviceActivityCenter](https://developer.apple.com/document
   trust the Mac, and enable **Developer Mode** on the device. The device must be
   paired with Xcode before it can be used from VS Code.
 
+### Pre-commit checks
+
+The repository can run SwiftFormat and SwiftLint automatically before commits
+that include Swift files. Install the tools once:
+
+```bash
+brew install pre-commit swiftformat swiftlint
+pre-commit install
+```
+
+Run the hook manually against all tracked files when needed:
+
+```bash
+pre-commit run --all-files
+```
+
+SwiftFormat automatically formats staged Swift files. If it changes anything,
+review the result, stage the changes, and retry the commit. Its shared policy is
+in [`.swiftformat`](.swiftformat), while SwiftLint uses [`.swiftlint.yml`](.swiftlint.yml).
+The hooks do not build the app or run iOS tests. To bypass them for one commit,
+use `git commit --no-verify`.
+
 ### Enable Developer Mode on an iPhone
 
 The **Developer Mode** setting may not appear until the iPhone has started pairing

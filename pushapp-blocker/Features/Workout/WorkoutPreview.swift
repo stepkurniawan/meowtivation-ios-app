@@ -8,7 +8,7 @@ struct WorkoutPreview: UIViewRepresentable {
     let configuration: WorkoutPoseConfiguration
     let onRotation: (Double) -> Void
 
-    func makeUIView(context: Context) -> WorkoutPreviewView {
+    func makeUIView(context _: Context) -> WorkoutPreviewView {
         let view = WorkoutPreviewView()
         view.preview.session = session
         view.configuration = configuration
@@ -16,7 +16,7 @@ struct WorkoutPreview: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ view: WorkoutPreviewView, context: Context) {
+    func updateUIView(_ view: WorkoutPreviewView, context _: Context) {
         view.frameData = frame
         view.configuration = configuration
         view.imageAspect = frame?.imageAspectRatio ?? view.imageAspect
@@ -25,9 +25,19 @@ struct WorkoutPreview: UIViewRepresentable {
 }
 
 final class WorkoutPreviewView: UIView {
-    override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
+    // UIView requires this override to remain a class property.
+    // swiftlint:disable:next static_over_final_class
+    override class var layerClass: AnyClass {
+        AVCaptureVideoPreviewLayer.self
+    }
 
-    var preview: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    var preview: AVCaptureVideoPreviewLayer {
+        guard let previewLayer = layer as? AVCaptureVideoPreviewLayer else {
+            fatalError("WorkoutPreviewView must use AVCaptureVideoPreviewLayer")
+        }
+        return previewLayer
+    }
+
     var onRotation: ((Double) -> Void)?
     var frameData: PoseFrame?
     var configuration: WorkoutPoseConfiguration?
@@ -47,8 +57,14 @@ final class WorkoutPreviewView: UIView {
         }
     }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
+    // Preview layout also maps Vision points and draws the current skeleton.
+    // Preview layout maps points and draws the current skeleton in one pass.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     override func layoutSubviews() {
         super.layoutSubviews()
         let rotation: Double
@@ -59,7 +75,9 @@ final class WorkoutPreviewView: UIView {
         default: rotation = 90
         }
         if let connection = preview.connection {
-            if connection.isVideoRotationAngleSupported(rotation) { connection.videoRotationAngle = rotation }
+            if connection.isVideoRotationAngleSupported(rotation) {
+                connection.videoRotationAngle = rotation
+            }
             if connection.isVideoMirroringSupported {
                 connection.automaticallyAdjustsVideoMirroring = false
                 connection.isVideoMirrored = true
@@ -83,7 +101,8 @@ final class WorkoutPreviewView: UIView {
         if let frameData, let configuration {
             for bone in configuration.bones {
                 if let start = frameData.joints[bone.start], let end = frameData.joints[bone.end],
-                   start.isUsable, end.isUsable {
+                   start.isUsable, end.isUsable
+                {
                     good.move(to: point(start)); good.addLine(to: point(end))
                 }
             }

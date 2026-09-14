@@ -76,7 +76,7 @@ struct BlockedAppsView: View {
             selection: $store.selection
         )
         .alert("App Blocking Setup Failed", isPresented: isAuthorizationAlertPresented) {
-            Button("OK", role: .cancel) { }
+            Button("OK", role: .cancel) {}
         } message: {
             Text(authorizationError ?? "Allow Screen Time access to choose apps.")
         }

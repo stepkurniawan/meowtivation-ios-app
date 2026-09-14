@@ -7,8 +7,9 @@
 
 import XCTest
 
-final class pushapp_blockerUITestsLaunchTests: XCTestCase {
-
+final class PushAppBlockerUITestsLaunchTests: XCTestCase {
+    // XCTestCase requires this class-property override for UI configuration.
+    // swiftlint:disable:next static_over_final_class
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
     }

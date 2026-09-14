@@ -5,13 +5,12 @@
 //  Created by stephen on 01.09.26.
 //
 
-import Testing
-import Foundation
 import FamilyControls
+import Foundation
 @testable import pushapp_blocker
+import Testing
 
-struct pushapp_blockerTests {
-
+struct PushAppBlockerTests {
     @MainActor
     @Test func monitorReadsSavedCompletionWithoutOpeningTheApp() throws {
         let suiteName = "DailyLockTests.\(UUID().uuidString)"
@@ -30,7 +29,11 @@ struct pushapp_blockerTests {
         #expect(!DailyBlocking.isLocked(in: monitorDefaults, now: dayOne, calendar: calendar))
         let dayTwo = dayOne.addingTimeInterval(24 * 60 * 60)
         #expect(DailyBlocking.isLocked(in: monitorDefaults, now: dayTwo, calendar: calendar))
-        #expect(DailyBlocking.isLocked(in: monitorDefaults, now: dayOne.addingTimeInterval(7 * 24 * 60 * 60), calendar: calendar))
+        #expect(DailyBlocking.isLocked(
+            in: monitorDefaults,
+            now: dayOne.addingTimeInterval(7 * 24 * 60 * 60),
+            calendar: calendar
+        ))
 
         // A callback delivered after today's workout must keep today's unlock.
         appDefaults.set(dayTwo, forKey: DailyBlocking.workoutCompletionKey)
@@ -45,7 +48,9 @@ struct pushapp_blockerTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var shouldFail = true
         let store = BlockedAppsStore(defaults: defaults, startMonitoring: {
-            if shouldFail { throw ScheduleError.unavailable }
+            if shouldFail {
+                throw ScheduleError.unavailable
+            }
         })
 
         #expect(throws: ScheduleError.self) { try store.completeDailyWorkout() }
@@ -98,7 +103,13 @@ struct pushapp_blockerTests {
         let store = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
         try store.completeDailyWorkout()
 
-        now = try #require(calendar.date(from: DateComponents(year: 2026, month: month, day: day, hour: 23, minute: 59)))
+        now = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: month,
+            day: day,
+            hour: 23,
+            minute: 59
+        )))
         store.refreshLockState()
         #expect(!store.isLocked)
 
@@ -155,7 +166,9 @@ struct pushapp_blockerTests {
         var authorized = true
         var failSchedule = false
         let store = BlockedAppsStore(defaults: defaults, startMonitoring: {
-            if failSchedule { throw ScheduleError.unavailable }
+            if failSchedule {
+                throw ScheduleError.unavailable
+            }
         }, authorizationCheck: { authorized })
         try store.setDeveloperLockOverride(isLocked: false)
         failSchedule = true
@@ -178,5 +191,4 @@ struct pushapp_blockerTests {
         #expect(!store.isLocked && store.monitoringError == nil)
         #expect(defaults.object(forKey: DailyBlocking.workoutCompletionKey) == nil)
     }
-
 }

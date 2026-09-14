@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 @testable import pushapp_blocker
+import Testing
 
 struct AutomaticWorkoutRecognitionTests {
     @Test func firstPushUpRepSelectsAndCountsTheWorkout() {
@@ -12,7 +12,7 @@ struct AutomaticWorkoutRecognitionTests {
         let updates = [
             PushUpFixtures.frame(angle: 160, time: 1.1),
             PushUpFixtures.frame(angle: 90, time: 1.3),
-            PushUpFixtures.frame(angle: 160, time: 1.5)
+            PushUpFixtures.frame(angle: 160, time: 1.5),
         ].map { engine.consume($0) }
 
         #expect(updates.last?.selectedExercise == .pushUp)
@@ -30,7 +30,7 @@ struct AutomaticWorkoutRecognitionTests {
         let updates = [
             SquatFixtures.frame(angle: 170, time: 1.1, visibleSide: visibleSide),
             SquatFixtures.frame(angle: 90, time: 1.3, visibleSide: visibleSide),
-            SquatFixtures.frame(angle: 170, time: 1.5, visibleSide: visibleSide)
+            SquatFixtures.frame(angle: 170, time: 1.5, visibleSide: visibleSide),
         ].map { engine.consume($0) }
 
         #expect(updates.last?.selectedExercise == .squat)
@@ -39,17 +39,17 @@ struct AutomaticWorkoutRecognitionTests {
     }
 
     @Test(arguments: [0, 1])
-    func bentArmsDoNotBlockAutomaticSquatSelection(_ visibleSide: Int) {
-        func squatFrame(angle: Float, time: Double) -> PoseFrame {
+    func bentArmsDoNotBlockAutomaticSquatSelection(_ visibleSide: Int) throws {
+        func squatFrame(angle: Float, time: Double) throws -> PoseFrame {
             var frame = SquatFixtures.frame(angle: angle, time: time, visibleSide: visibleSide)
             let shoulder: BodyJoint = visibleSide == 0 ? .rightShoulder : .leftShoulder
             let elbow: BodyJoint = visibleSide == 0 ? .rightElbow : .leftElbow
             let wrist: BodyJoint = visibleSide == 0 ? .rightWrist : .leftWrist
-            let hip = frame.joints[Squat.legChains[visibleSide][0]]!.position
+            let hip = try #require(frame.joints[Squat.legChains[visibleSide][0]]?.position)
             let positions: [(BodyJoint, SIMD2<Float>)] = [
                 (shoulder, hip + [0, 0.25]),
                 (elbow, hip + [0.15, 0.25]),
-                (wrist, hip + [0.15, 0.10])
+                (wrist, hip + [0.15, 0.10]),
             ]
             for (joint, position) in positions {
                 frame.joints[joint] = PoseJoint(position: position, imagePoint: position,
@@ -59,15 +59,15 @@ struct AutomaticWorkoutRecognitionTests {
         }
 
         var engine = AutomaticWorkoutRecognitionEngine()
-        let calibration = stride(from: 0.0, through: 1.0, by: 0.1).map {
-            engine.consume(squatFrame(angle: 170, time: $0))
+        let calibration = try stride(from: 0.0, through: 1.0, by: 0.1).map {
+            engine.consume(try squatFrame(angle: 170, time: $0))
         }
         #expect(calibration.first?.suggestedExercise == .squat)
         #expect(calibration.last?.poseReady == true)
 
-        _ = engine.consume(squatFrame(angle: 170, time: 1.1))
-        _ = engine.consume(squatFrame(angle: 90, time: 1.3))
-        let result = engine.consume(squatFrame(angle: 170, time: 1.5))
+        _ = engine.consume(try squatFrame(angle: 170, time: 1.1))
+        _ = engine.consume(try squatFrame(angle: 90, time: 1.3))
+        let result = engine.consume(try squatFrame(angle: 170, time: 1.5))
         #expect(result.selectedExercise == .squat)
         #expect(result.reps.count == 1)
     }

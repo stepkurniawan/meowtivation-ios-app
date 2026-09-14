@@ -29,7 +29,7 @@ nonisolated struct PushUpRecognitionUpdate: Sendable {
     var reps: [PushUpRepEvent] = []
 }
 
-nonisolated private struct CycleDetector {
+private nonisolated struct CycleDetector {
     enum Phase { case waiting, extended, contracted }
     var phase = Phase.waiting
     var startedAt = 0.0
@@ -42,14 +42,17 @@ nonisolated private struct CycleDetector {
 
         switch phase {
         case .waiting:
-            guard angle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters
+                .minimumRecoveryAngle else { return false }
             phase = .extended
             startedAt = time
         case .extended:
-            guard angle <= PushUpRecognitionParameters.maximumContractedAngle + PushUpRecognitionParameters.angleTolerance else { return false }
+            guard angle <= PushUpRecognitionParameters.maximumContractedAngle + PushUpRecognitionParameters
+                .angleTolerance else { return false }
             phase = .contracted
         case .contracted:
-            guard angle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters
+                .minimumRecoveryAngle else { return false }
             let duration = time - startedAt
             let valid = duration >= PushUpRecognitionParameters.minimumCycleDuration &&
                 duration <= PushUpRecognitionParameters.maximumCycleDuration
@@ -97,6 +100,8 @@ nonisolated struct PushUpRecognitionEngine {
         // Preserve the event sequence across resets to prevent duplicate credits.
     }
 
+    // The push-up state machine keeps dropout, calibration, and per-arm transitions atomic.
+    // swiftlint:disable:next function_body_length
     mutating func consume(_ frame: PoseFrame) -> PushUpRecognitionUpdate {
         guard frame.timestamp.isFinite else {
             resetTracking()
@@ -139,7 +144,9 @@ nonisolated struct PushUpRecognitionEngine {
             let completed = detector.consume(sample, at: frame.timestamp)
             detectors[side] = detector
             guard completed,
-                  lastRepAt.map({ frame.timestamp - $0 >= PushUpRecognitionParameters.armRepDeduplicationDuration }) ?? true else {
+                  lastRepAt
+                  .map({ frame.timestamp - $0 >= PushUpRecognitionParameters.armRepDeduplicationDuration }) ?? true
+            else {
                 continue
             }
             nextID += 1
@@ -156,7 +163,8 @@ nonisolated struct PushUpRecognitionEngine {
     }
 
     private mutating func calibrate(_ candidates: [PushUpSample],
-                                    at timestamp: TimeInterval) -> PushUpRecognitionUpdate {
+                                    at timestamp: TimeInterval) -> PushUpRecognitionUpdate
+    {
         let extended = candidates.filter {
             $0.angle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters.minimumRecoveryAngle
         }

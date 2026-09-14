@@ -39,10 +39,12 @@ nonisolated enum SquatPose {
     }
 
     private static func sample(hip: PoseJoint?, knee: PoseJoint?, ankle: PoseJoint?,
-                               side: Int) -> SquatSample? {
+                               side: Int) -> SquatSample?
+    {
         guard let hip, let knee, let ankle else { return nil }
-        guard (0.04...0.8).contains(simd_distance(hip.position, knee.position)),
-              (0.04...0.8).contains(simd_distance(knee.position, ankle.position)) else {
+        guard (0.04 ... 0.8).contains(simd_distance(hip.position, knee.position)),
+              (0.04 ... 0.8).contains(simd_distance(knee.position, ankle.position))
+        else {
             return nil
         }
         let kneeAngle = PoseFeatures.angle(hip.position, knee.position, ankle.position)

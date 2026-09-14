@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 
+// The workout screen keeps setup, live feedback, controls, and summary together.
+// swiftlint:disable:next type_body_length
 struct WorkoutView: View {
     private enum TapSide {
         case left, right
@@ -20,28 +22,37 @@ struct WorkoutView: View {
     }
 
     private var activePlacement: String {
-        model.selectedExercise?.placement ?? "Keep one person in view. Try either a side-view push-up or a full-body squat."
+        model.selectedExercise?.placement ??
+            "Keep one person in view. Try either a side-view push-up or a full-body squat."
     }
 
     private var activeConfiguration: WorkoutPoseConfiguration {
         model.selectedExercise?.poseConfiguration ?? .automatic
     }
 
-    /// The main view for the workout session. It displays different content based on the state of the workout session (not started, in progress, or ended).
+    /// The main view for the workout session. It displays different content based on the state of the workout session
+    /// (not started, in progress, or ended).
     var body: some View {
         NavigationStack {
             Group {
-                if model.hasEnded { summary }
-                else if !model.hasStarted { instructions }
-                else { workout }
+                if model.hasEnded {
+                    summary
+                } else if !model.hasStarted {
+                    instructions
+                } else {
+                    workout
+                }
             }
             .navigationTitle(model.hasEnded ? "Workout Summary" : "Workout")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(model.hasStarted && !model.hasEnded ? "End Workout" : "Done") {
-                        if model.hasStarted && !model.hasEnded { model.end() }
-                        else { dismiss() }
+                        if model.hasStarted && !model.hasEnded {
+                            model.end()
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
                 if model.hasStarted && !model.hasEnded {
@@ -75,12 +86,19 @@ struct WorkoutView: View {
         .onChange(of: scenePhase) { _, phase in
             developerTapProgress = []
             lastDeveloperTap = nil
-            if phase == .active { model.resume() }
-            else { model.pause() }
+            if phase == .active {
+                model.resume()
+            } else {
+                model.pause()
+            }
             UIApplication.shared.isIdleTimerDisabled = phase == .active && model.hasStarted && !model.hasEnded
         }
         .onChange(of: model.hasStarted) { _, started in UIApplication.shared.isIdleTimerDisabled = started }
-        .onChange(of: model.hasEnded) { _, ended in if ended { UIApplication.shared.isIdleTimerDisabled = false } }
+        .onChange(of: model.hasEnded) { _, ended in
+            if ended {
+                UIApplication.shared.isIdleTimerDisabled = false
+            }
+        }
         .onDisappear {
             developerTapProgress = []
             lastDeveloperTap = nil
@@ -95,14 +113,28 @@ struct WorkoutView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Set up your phone").font(.title.bold())
-                Text("Lean your phone securely against a wall with the screen facing you. Keep one person in view. Rotate the phone if you need a wider view.")
+                Text(
+                    "Lean your phone securely against a wall with the screen facing you. Keep one person in view. " +
+                        "Rotate the phone if you need a wider view."
+                )
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Push-up or Squat").font(.headline)
-                    Text("For a push-up, keep one shoulder, elbow, wrist, and preferably your hip visible from the side. For a squat, keep one shoulder, hip, knee, and ankle visible. Your arms can be bent.")
+                    Text(
+                        "For a push-up, keep one shoulder, elbow, wrist, and preferably your hip visible from " +
+                            "the side. " +
+                            "For a squat, keep one shoulder, hip, knee, and ankle visible. " +
+                            "Your arms can be bent."
+                    )
                 }
-                Text("Hold your starting position still until Start! appears, then begin. The first complete rep selects the exercise and counts as rep 1.")
-                Text("Video stays on your phone and is not saved. This session counts reps; it does not unlock blocked apps.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                Text(
+                    "Hold your starting position still until Start! appears, then begin. " +
+                        "The first complete rep selects the exercise and counts as rep 1."
+                )
+                Text(
+                    "Video stays on your phone and is not saved. This session counts reps; " +
+                        "it does not unlock blocked apps."
+                )
+                .font(.footnote).foregroundStyle(.secondary)
                 Button("Start Counting") { model.start() }
                     .buttonStyle(.borderedProminent).controlSize(.large)
                     .frame(maxWidth: .infinity)
@@ -110,7 +142,8 @@ struct WorkoutView: View {
         }
     }
 
-    /// A view that displays the live camera preview and workout controls. Also checks portrait or landscape orientation and adjusts the layout accordingly.
+    /// A view that displays the live camera preview and workout controls. Also checks portrait or landscape orientation
+    /// and adjusts the layout accordingly.
     private var workout: some View {
         GeometryReader { geometry in
             let landscape: Bool = geometry.size.width > geometry.size.height
@@ -143,10 +176,14 @@ struct WorkoutView: View {
                         Text(model.cameraState.message).multilineTextAlignment(.center)
                         if model.cameraState == .denied {
                             Button("Open Settings") {
-                                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
                             }
                         }
-                        if case .failed = model.cameraState { Button("Try Again") { model.retry() } }
+                        if case .failed = model.cameraState {
+                            Button("Try Again") { model.retry() }
+                        }
                     }
                     .padding().foregroundStyle(.white)
                     .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 12)).padding()
@@ -180,15 +217,20 @@ struct WorkoutView: View {
             countCard
             if developerMode {
                 Text(String(format: "%.1f fps · %.0f ms · %d usable joints", model.analysisFPS,
-                            model.processingMilliseconds, model.latestFrame?.joints.values.filter(\.isUsable).count ?? 0))
+                            model.processingMilliseconds,
+                            model.latestFrame?.joints.values.filter(\.isUsable).count ?? 0))
                     .font(.caption.monospaced())
                 if !model.armAngles.isEmpty || !model.kneeAngles.isEmpty {
-                    Text(model.armAngles.keys.sorted().map {
-                        "\($0 == 0 ? "Right" : "Left"): \(Int(model.armAngles[$0]!))°"
-                    }.joined(separator: " · ") +
-                    (model.kneeAngles.isEmpty ? "" : "  knees: " + model.kneeAngles.keys.sorted().map {
-                        "\($0 == 0 ? "Right" : "Left"): \(Int(model.kneeAngles[$0]!))°"
-                    }.joined(separator: " · "))).font(.caption.monospaced())
+                    let armText = model.armAngles.keys.sorted().compactMap { side -> String? in
+                        guard let angle = model.armAngles[side] else { return nil }
+                        return "\(side == 0 ? "Right" : "Left"): \(Int(angle))°"
+                    }.joined(separator: " · ")
+                    let kneeText = model.kneeAngles.keys.sorted().compactMap { side -> String? in
+                        guard let angle = model.kneeAngles[side] else { return nil }
+                        return "\(side == 0 ? "Right" : "Left"): \(Int(angle))°"
+                    }.joined(separator: " · ")
+                    Text(armText + (kneeText.isEmpty ? "" : "  knees: " + kneeText))
+                        .font(.caption.monospaced())
                 }
                 Text("Green: corroborated joint. Orange: rejected. A returned joint does not prove visibility.")
                     .font(.caption2)
@@ -225,7 +267,8 @@ struct WorkoutView: View {
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// A view that displays a summary of the workout session, including an icon, completion message, workout count, and a "Done" button to dismiss the view.
+    /// A view that displays a summary of the workout session, including an icon, completion message, workout count, and
+    /// a "Done" button to dismiss the view.
     private var summary: some View {
         VStack(spacing: 24) {
             Image(systemName: "figure.strengthtraining.traditional").font(.system(size: 60))

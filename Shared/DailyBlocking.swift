@@ -1,7 +1,7 @@
 import DeviceActivity // DeviceActivityName, DeviceActivitySchedule, DeviceActivityCenter
 import FamilyControls // FamilyActivitySelection
-import Foundation     // Date, UserDefaults
-import ManagedSettings // ManagedSettingsStore 
+import Foundation // Date, UserDefaults
+import ManagedSettings // ManagedSettingsStore
 
 // Compiled into both the app and its monitor extension.
 nonisolated enum DailyBlocking {
@@ -14,7 +14,9 @@ nonisolated enum DailyBlocking {
         let date: Date
     }
 
-    static func developerOverride(in defaults: UserDefaults, now: Date, calendar: Calendar = .autoupdatingCurrent) -> DeveloperOverride? {
+    static func developerOverride(in defaults: UserDefaults, now: Date,
+                                  calendar: Calendar = .autoupdatingCurrent) -> DeveloperOverride?
+    {
         guard let data = defaults.data(forKey: developerOverrideKey),
               let override = try? JSONDecoder().decode(DeveloperOverride.self, from: data),
               calendar.isDate(override.date, inSameDayAs: now) else { return nil }
@@ -23,7 +25,12 @@ nonisolated enum DailyBlocking {
 
     static let activity = DeviceActivityName("dailyWorkoutReset")
     static let storeName = ManagedSettingsStore.Name("dailyWorkout")
-    static let defaults = UserDefaults(suiteName: AppSettings.appGroup)!
+    static let defaults: UserDefaults = {
+        guard let defaults = UserDefaults(suiteName: AppSettings.appGroup) else {
+            preconditionFailure("The app group UserDefaults store is unavailable")
+        }
+        return defaults
+    }()
 
     /// Returns a device activity schedule configured to repeat every day at midnight.
     ///
@@ -43,8 +50,9 @@ nonisolated enum DailyBlocking {
     /// If monitoring is already active, this method returns early without making duplicate requests.
     /// - Throws: `DeviceActivityError` if the monitoring request fails.
     static func startMonitoring() throws {
-        let center: DeviceActivityCenter = DeviceActivityCenter() // DeviceActivityCenter is a singleton that manages device activity monitoring.
-        guard !center.activities.contains(activity) else { return }  
+        let center: DeviceActivityCenter =
+            DeviceActivityCenter() // DeviceActivityCenter is a singleton that manages device activity monitoring.
+        guard !center.activities.contains(activity) else { return }
         try center.startMonitoring(activity, during: schedule)
     }
 
@@ -56,7 +64,11 @@ nonisolated enum DailyBlocking {
     /// - Returns: The decoded `FamilyActivitySelection`, or an empty selection if none exists.
     static func selection(from defaults: UserDefaults) -> FamilyActivitySelection {
         guard let data: Data = defaults.data(forKey: selectionKey),
-              let selection: FamilyActivitySelection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data) else {
+              let selection: FamilyActivitySelection = try? JSONDecoder().decode(
+                  FamilyActivitySelection.self,
+                  from: data
+              )
+        else {
             return FamilyActivitySelection()
         }
         return selection

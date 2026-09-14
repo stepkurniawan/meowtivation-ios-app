@@ -1,5 +1,6 @@
 # SwiftLint configuration for the iOS targets in this repository.
 excluded:
+  - .agents
   - .build
   - DerivedData
   - "**/Generated"
@@ -9,7 +10,12 @@ opt_in_rules:
   - force_try
   - empty_count
 
-disabled_rules: []
+disabled_rules:
+  # SwiftFormat owns these formatting choices in this repository.
+  - opening_brace
+  - trailing_comma
+  # The test suite intentionally keeps related state-machine fixtures together.
+  - file_length
 
 custom_rules:
   hardcoded_secret_literal:

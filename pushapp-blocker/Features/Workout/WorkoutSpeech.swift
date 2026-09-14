@@ -35,7 +35,7 @@ final class WorkoutSpeech: NSObject, WorkoutSpeaking, AVSpeechSynthesizerDelegat
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    nonisolated func speechSynthesizer(_: AVSpeechSynthesizer, didFinish _: AVSpeechUtterance) {
         Task { @MainActor [weak self] in
             guard let self, !self.synthesizer.isSpeaking else { return }
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)

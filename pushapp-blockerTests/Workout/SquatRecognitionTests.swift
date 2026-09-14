@@ -1,7 +1,7 @@
 import Foundation
+@testable import pushapp_blocker
 import simd
 import Testing
-@testable import pushapp_blocker
 
 nonisolated enum SquatFixtures {
     static func frame(angle: Float, time: Double, visibleSide: Int? = nil) -> PoseFrame {
@@ -71,7 +71,7 @@ struct SquatRecognitionTests {
         let frames = [
             SquatFixtures.frame(angle: 170, time: 1.1, visibleSide: visibleSide),
             SquatFixtures.frame(angle: 90, time: 1.3, visibleSide: visibleSide),
-            SquatFixtures.frame(angle: 170, time: 1.5, visibleSide: visibleSide)
+            SquatFixtures.frame(angle: 170, time: 1.5, visibleSide: visibleSide),
         ]
 
         let updates = frames.map { engine.consume($0) }
@@ -89,7 +89,7 @@ struct SquatRecognitionTests {
             SquatFixtures.frame(angles: [170, 170], time: 1.9),
             SquatFixtures.frame(angles: [170, 170], time: 2.0),
             SquatFixtures.frame(angles: [90, 90], time: 2.1),
-            SquatFixtures.frame(angles: [170, 170], time: 2.4)
+            SquatFixtures.frame(angles: [170, 170], time: 2.4),
         ]
 
         let updates = frames.map { engine.consume($0) }
@@ -100,5 +100,4 @@ struct SquatRecognitionTests {
         #expect(updates[3].reps.isEmpty)
         #expect(updates[6].reps.count == 1)
     }
-
 }

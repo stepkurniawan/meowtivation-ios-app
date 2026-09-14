@@ -1,8 +1,8 @@
 import AVFoundation
 import CoreMotion
 import Foundation
-import Vision
 import simd
+import Vision
 
 nonisolated enum WorkoutCameraState: Equatable, Sendable {
     case idle, requestingPermission, running, denied, unavailable, interrupted, failed(String)
@@ -14,7 +14,7 @@ nonisolated enum WorkoutCameraState: Equatable, Sendable {
         case .denied: "Allow Camera access in Settings to start your workout."
         case .unavailable: "A front camera is unavailable. Use a physical iPhone to track your workout."
         case .interrupted: "Camera interrupted. Tracking will resume when the camera is available."
-        case .failed(let message): message
+        case let .failed(message): message
         }
     }
 }
@@ -33,12 +33,17 @@ nonisolated protocol WorkoutCameraControlling: AnyObject {
 }
 
 nonisolated extension WorkoutCameraControlling {
-    func updatePoseConfiguration(_ configuration: WorkoutPoseConfiguration) { }
+    func updatePoseConfiguration(_: WorkoutPoseConfiguration) {}
 }
 
-/// All mutable capture and Vision state is confined to queue. The preview only
-/// attaches the session; it never starts, stops, or configures capture itself.
-nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+// All mutable capture and Vision state is confined to queue. The preview only
+// attaches the session; it never starts, stops, or configures capture itself.
+// swiftlint:disable:next type_body_length
+final nonisolated class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCaptureVideoDataOutputSampleBufferDelegate,
+    // AVFoundation delegate state is confined to the capture queue.
+    // swiftlint:disable:next unchecked_sendable
+    @unchecked Sendable
+{
     let session = AVCaptureSession()
     private let queue = DispatchQueue(label: "workout.capture", qos: .userInitiated)
     private let output = AVCaptureVideoDataOutput()
@@ -59,17 +64,21 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     private var didSetCameraTarget = false
 
     init(configuration: WorkoutPoseConfiguration,
-         onEvent: @escaping @Sendable (Int, WorkoutCameraEvent) -> Void) {
+         onEvent: @escaping @Sendable (Int, WorkoutCameraEvent) -> Void)
+    {
         self.configuration = configuration
         self.onEvent = onEvent
         super.init()
         for name in [AVCaptureSession.wasInterruptedNotification,
                      AVCaptureSession.interruptionEndedNotification,
-                     AVCaptureSession.runtimeErrorNotification] {
-            observers.append(NotificationCenter.default.addObserver(forName: name, object: session, queue: nil) { [weak self] note in
-                let name = note.name
-                self?.queue.async { [weak self] in self?.handleNotification(name) }
-            })
+                     AVCaptureSession.runtimeErrorNotification]
+        {
+            observers
+                .append(NotificationCenter.default
+                    .addObserver(forName: name, object: session, queue: nil) { [weak self] note in
+                        let name = note.name
+                        self?.queue.async { [weak self] in self?.handleNotification(name) }
+                    })
         }
     }
 
@@ -80,8 +89,10 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
 
     /// Start the camera and begin analyzing frames for body pose.
     /// - Parameters:
-    ///   - generation: A unique identifier for this camera session. If a new session is started, the previous session will be ignored.
-    ///   - rotation: The rotation of the camera in degrees. The camera is rotated to match the device orientation, so the image is always upright.
+    ///   - generation: A unique identifier for this camera session. If a new session is started, the previous session
+    /// will be ignored.
+    ///   - rotation: The rotation of the camera in degrees. The camera is rotated to match the device orientation, so
+    /// the image is always upright.
     func start(generation: Int, rotation: Double) {
         queue.async { [self] in
             self.generation = generation
@@ -99,7 +110,11 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                     guard let self else { return }
                     self.queue.async {
                         guard self.active, self.generation == generation else { return }
-                        if allowed { self.configureAndStart() } else { self.emit(.state(.denied)) }
+                        if allowed {
+                            self.configureAndStart()
+                        } else {
+                            self.emit(.state(.denied))
+                        }
                     }
                 }
             default: emit(.state(.denied))
@@ -111,7 +126,9 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
         queue.async { [self] in
             active = false
             motion.stopDeviceMotionUpdates()
-            if session.isRunning { session.stopRunning() }
+            if session.isRunning {
+                session.stopRunning()
+            }
         }
     }
 
@@ -123,7 +140,9 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             lastAnalysis = -.infinity
             poseStabilizer.reset()
             didSetCameraTarget = false
-            if let device { configureAutomaticFocusAndExposure(on: device, at: CGPoint(x: 0.5, y: 0.5)) }
+            if let device {
+                configureAutomaticFocusAndExposure(on: device, at: CGPoint(x: 0.5, y: 0.5))
+            }
             movingUntil = ProcessInfo.processInfo.systemUptime + 0.75
             emit(.frame(PoseFrame(timestamp: ProcessInfo.processInfo.systemUptime, joints: [:],
                                   cameraIsMoving: true), milliseconds: 0))
@@ -138,13 +157,16 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
         }
     }
 
-    private func emit(_ event: WorkoutCameraEvent) { onEvent(generation, event) }
+    private func emit(_ event: WorkoutCameraEvent) {
+        onEvent(generation, event)
+    }
 
     private func configureAndStart() {
         guard active else { return }
         do {
             if !configured {
-                guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
+                guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+                else {
                     emit(.state(.unavailable)); return
                 }
                 self.device = device
@@ -154,22 +176,30 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                 guard session.canAddInput(input), session.canAddOutput(output) else {
                     emit(.state(.unavailable)); return
                 }
-                if session.canSetSessionPreset(.hd1280x720) { session.sessionPreset = .hd1280x720 }
+                if session.canSetSessionPreset(.hd1280x720) {
+                    session.sessionPreset = .hd1280x720
+                }
                 requestTargetFrameRate(on: device)
                 session.addInput(input)
                 output.alwaysDiscardsLateVideoFrames = true
-                output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
+                output
+                    .videoSettings =
+                    [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
                 output.setSampleBufferDelegate(self, queue: queue)
                 session.addOutput(output)
                 configured = true
                 applyRotation()
             }
-            if let device { configureAutomaticFocusAndExposure(on: device, at: CGPoint(x: 0.5, y: 0.5)) }
+            if let device {
+                configureAutomaticFocusAndExposure(on: device, at: CGPoint(x: 0.5, y: 0.5))
+            }
             if motion.isDeviceMotionAvailable {
                 motion.deviceMotionUpdateInterval = 1.0 / 30
                 motion.startDeviceMotionUpdates()
             }
-            if !session.isRunning { session.startRunning() }
+            if !session.isRunning {
+                session.startRunning()
+            }
             emit(.state(session.isRunning ? .running : .failed("Unable to start the camera. Try again.")))
         } catch {
             emit(.state(.failed("Unable to configure the camera. Try again.")))
@@ -198,10 +228,18 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
         do {
             try device.lockForConfiguration()
             defer { device.unlockForConfiguration() }
-            if device.isFocusPointOfInterestSupported { device.focusPointOfInterest = point }
-            if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
-            if device.isExposurePointOfInterestSupported { device.exposurePointOfInterest = point }
-            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            if device.isFocusPointOfInterestSupported {
+                device.focusPointOfInterest = point
+            }
+            if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+            }
+            if device.isExposurePointOfInterestSupported {
+                device.exposurePointOfInterest = point
+            }
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
         } catch {
             // Preserve the device's default automatic behavior when it cannot be configured.
         }
@@ -209,7 +247,9 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
 
     private func applyRotation() {
         guard let connection = output.connection(with: .video) else { return }
-        if connection.isVideoRotationAngleSupported(rotation) { connection.videoRotationAngle = rotation }
+        if connection.isVideoRotationAngleSupported(rotation) {
+            connection.videoRotationAngle = rotation
+        }
         if connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
             connection.isVideoMirrored = false
@@ -227,12 +267,17 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
             emit(.state(.failed("The camera stopped unexpectedly. Try again.")))
             active = false
             motion.stopDeviceMotionUpdates()
-            if session.isRunning { session.stopRunning() }
+            if session.isRunning {
+                session.stopRunning()
+            }
         }
     }
 
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
-                       from connection: AVCaptureConnection) {
+    // Camera ingestion intentionally keeps sampling, Vision analysis, and recovery together.
+    // swiftlint:disable:next function_body_length
+    func captureOutput(_: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
+                       from _: AVCaptureConnection)
+    {
         guard active, !session.isInterrupted else { return }
         let now = ProcessInfo.processInfo.systemUptime
         guard now - lastAnalysis >= 1.0 / PoseDetectionParameters.targetFPS else { return }
@@ -240,7 +285,9 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
         if let reading = motion.deviceMotion {
             let rate = reading.rotationRate, acceleration = reading.userAcceleration
             if sqrt(rate.x * rate.x + rate.y * rate.y + rate.z * rate.z) > 0.15 ||
-                sqrt(acceleration.x * acceleration.x + acceleration.y * acceleration.y + acceleration.z * acceleration.z) > 0.08 {
+                sqrt(acceleration.x * acceleration.x + acceleration.y * acceleration.y + acceleration.z * acceleration
+                    .z) > 0.08
+            {
                 movingUntil = now + 0.75
             }
         }
@@ -256,14 +303,14 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                     guard let point2D = try? body.recognizedPoint(joint.vision2DName) else { continue }
                     let observed = SIMD2(Float(point2D.location.x), Float(point2D.location.y))
                     rawJoints[joint] = PoseJoint(position: observed,
-                                                  imagePoint: observed,
-                                                  confidence2D: point2D.confidence)
+                                                 imagePoint: observed,
+                                                 confidence2D: point2D.confidence)
                 }
             }
             if !didSetCameraTarget, let target = configuration.cameraTarget(rawJoints), let device {
                 // Vision image points start at the lower left; AVCapture points start at the upper left.
                 configureAutomaticFocusAndExposure(on: device,
-                                                    at: CGPoint(x: CGFloat(target.x), y: CGFloat(1 - target.y)))
+                                                   at: CGPoint(x: CGFloat(target.x), y: CGFloat(1 - target.y)))
                 didSetCameraTarget = true
             }
             let joints = poseStabilizer.stabilize(rawJoints,
@@ -271,7 +318,8 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
                                                   at: now)
             failures = 0
             let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)
-            let aspect = imageBuffer.map { Double(CVPixelBufferGetWidth($0)) / Double(CVPixelBufferGetHeight($0)) } ?? 9.0 / 16
+            let aspect = imageBuffer
+                .map { Double(CVPixelBufferGetWidth($0)) / Double(CVPixelBufferGetHeight($0)) } ?? 9.0 / 16
             emit(.frame(PoseFrame(timestamp: now, joints: joints,
                                   cameraIsMoving: now < movingUntil, imageAspectRatio: aspect),
                         milliseconds: (ProcessInfo.processInfo.systemUptime - now) * 1000))
@@ -288,7 +336,7 @@ nonisolated final class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     }
 }
 
-nonisolated private extension BodyJoint {
+private nonisolated extension BodyJoint {
     var vision2DName: VNHumanBodyPoseObservation.JointName {
         switch self {
         case .leftShoulder: .leftShoulder

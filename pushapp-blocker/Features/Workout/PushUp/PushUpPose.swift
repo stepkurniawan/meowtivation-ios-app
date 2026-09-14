@@ -43,10 +43,12 @@ nonisolated enum PushUpPose {
     }
 
     private static func sample(shoulder: PoseJoint?, elbow: PoseJoint?, wrist: PoseJoint?,
-                               side: Int) -> PushUpSample? {
+                               side: Int) -> PushUpSample?
+    {
         guard let shoulder, let elbow, let wrist else { return nil }
-        guard (0.04...0.8).contains(simd_distance(shoulder.position, elbow.position)),
-              (0.04...0.8).contains(simd_distance(elbow.position, wrist.position)) else {
+        guard (0.04 ... 0.8).contains(simd_distance(shoulder.position, elbow.position)),
+              (0.04 ... 0.8).contains(simd_distance(elbow.position, wrist.position))
+        else {
             return nil
         }
         let elbowAngle = PoseFeatures.angle(shoulder.position, elbow.position, wrist.position)

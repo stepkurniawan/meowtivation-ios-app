@@ -40,8 +40,8 @@ nonisolated extension WorkoutPoseConfiguration {
                                             let points = tracked.compactMap { joint -> SIMD2<Float>? in
                                                 guard let value = joints[joint], value.confidence2D >= 0.5,
                                                       value.imagePoint.x.isFinite, value.imagePoint.y.isFinite,
-                                                      (0.0...1.0).contains(value.imagePoint.x),
-                                                      (0.0...1.0).contains(value.imagePoint.y) else { return nil }
+                                                      (0.0 ... 1.0).contains(value.imagePoint.x),
+                                                      (0.0 ... 1.0).contains(value.imagePoint.y) else { return nil }
                                                 return value.imagePoint
                                             }
                                             guard !points.isEmpty else { return nil }
@@ -93,7 +93,9 @@ nonisolated struct AutomaticWorkoutRecognitionEngine {
     private var squatMotionActive = false
     private var lastSquatMotionAt = -Double.infinity
 
-    var selectedExercise: WorkoutExercise? { selected }
+    var selectedExercise: WorkoutExercise? {
+        selected
+    }
 
     mutating func resetTracking() {
         pushUp.resetTracking()
@@ -108,6 +110,8 @@ nonisolated struct AutomaticWorkoutRecognitionEngine {
         nextID = 0
     }
 
+    // The automatic selector intentionally keeps both recognizers in lockstep.
+    // swiftlint:disable:next function_body_length
     mutating func consume(_ frame: PoseFrame) -> WorkoutRecognitionUpdate {
         if let selected {
             switch selected {
@@ -130,7 +134,8 @@ nonisolated struct AutomaticWorkoutRecognitionEngine {
             squatMotionActive = true
             lastSquatMotionAt = frame.timestamp
         } else if squatMotionActive,
-                  frame.timestamp - lastSquatMotionAt > SquatRecognitionParameters.legDropoutGraceDuration {
+                  frame.timestamp - lastSquatMotionAt > SquatRecognitionParameters.legDropoutGraceDuration
+        {
             squatMotionActive = false
         }
         if squatIsFlexed && !priorSquatMotion {
@@ -177,7 +182,8 @@ nonisolated struct AutomaticWorkoutRecognitionEngine {
     }
 
     private func combinedTracking(pushUpdate: PushUpRecognitionUpdate,
-                                  squatUpdate: SquatRecognitionUpdate) -> WorkoutTrackingState {
+                                  squatUpdate: SquatRecognitionUpdate) -> WorkoutTrackingState
+    {
         if pushUpdate.tracking == .cameraMoving || squatUpdate.tracking == .cameraMoving {
             return .cameraMoving
         }
@@ -199,7 +205,8 @@ nonisolated struct AutomaticWorkoutRecognitionEngine {
     private mutating func update(from update: PushUpRecognitionUpdate,
                                  selected exercise: WorkoutExercise,
                                  suggestion: WorkoutExercise? = nil,
-                                 reps: Int? = nil) -> WorkoutRecognitionUpdate {
+                                 reps: Int? = nil) -> WorkoutRecognitionUpdate
+    {
         let events = reps.map { makeEvents(count: $0, timestamp: update.reps.last?.timestamp ?? 0) }
         return WorkoutRecognitionUpdate(tracking: update.tracking.workoutState,
                                         poseReady: update.poseReady,
@@ -213,7 +220,8 @@ nonisolated struct AutomaticWorkoutRecognitionEngine {
     private mutating func update(from update: SquatRecognitionUpdate,
                                  selected exercise: WorkoutExercise,
                                  suggestion: WorkoutExercise? = nil,
-                                 reps: Int? = nil) -> WorkoutRecognitionUpdate {
+                                 reps: Int? = nil) -> WorkoutRecognitionUpdate
+    {
         let events = reps.map { makeEvents(count: $0, timestamp: update.reps.last?.timestamp ?? 0) }
         return WorkoutRecognitionUpdate(tracking: update.tracking.workoutState,
                                         poseReady: update.poseReady,
@@ -230,11 +238,11 @@ nonisolated struct AutomaticWorkoutRecognitionEngine {
     }
 
     private mutating func makeEvents(count: Int, timestamp: TimeInterval) -> [WorkoutRepEvent] {
-        (0..<count).map { _ in makeEvent(timestamp: timestamp) }
+        (0 ..< count).map { _ in makeEvent(timestamp: timestamp) }
     }
 }
 
-nonisolated private extension PushUpTrackingState {
+private nonisolated extension PushUpTrackingState {
     var workoutState: WorkoutTrackingState {
         switch self {
         case .findingPosition: .findingPosition
@@ -247,7 +255,7 @@ nonisolated private extension PushUpTrackingState {
     }
 }
 
-nonisolated private extension SquatTrackingState {
+private nonisolated extension SquatTrackingState {
     var workoutState: WorkoutTrackingState {
         switch self {
         case .findingPosition: .findingPosition
@@ -275,7 +283,8 @@ nonisolated enum InitialPoseClassifier {
                   let hip = usable(side == 0 ? .rightHip : .leftHip, in: frame) else { return false }
             let torso = shoulder.position - hip.position
             let elbowAngle = PoseFeatures.angle(shoulder.position, elbow.position, wrist.position)
-            return elbowAngle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters.minimumRecoveryAngle &&
+            return elbowAngle + PushUpRecognitionParameters.angleTolerance >= PushUpRecognitionParameters
+                .minimumRecoveryAngle &&
                 abs(torso.x) >= abs(torso.y) * dominantAxisRatio
         }
         let squat = Squat.legChains.indices.contains { side in
@@ -286,7 +295,8 @@ nonisolated enum InitialPoseClassifier {
                   let shoulder = usable(side == 0 ? .rightShoulder : .leftShoulder, in: frame) else { return false }
             let torso = shoulder.position - hip.position
             let kneeAngle = PoseFeatures.angle(hip.position, knee.position, ankle.position)
-            return kneeAngle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle &&
+            return kneeAngle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters
+                .minimumRecoveryAngle &&
                 abs(torso.y) >= abs(torso.x) * dominantAxisRatio
         }
         let result: WorkoutExercise?

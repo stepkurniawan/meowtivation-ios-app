@@ -37,9 +37,9 @@ nonisolated struct PoseJoint: Codable, Sendable {
 
     var isUsable: Bool {
         position.x.isFinite && position.y.isFinite &&
-        imagePoint.x.isFinite && imagePoint.y.isFinite &&
-        (0.005...0.995).contains(imagePoint.x) && (0.005...0.995).contains(imagePoint.y) &&
-        confidence2D >= PoseDetectionParameters.minimumConfidence
+            imagePoint.x.isFinite && imagePoint.y.isFinite &&
+            (0.005 ... 0.995).contains(imagePoint.x) && (0.005 ... 0.995).contains(imagePoint.y) &&
+            confidence2D >= PoseDetectionParameters.minimumConfidence
     }
 }
 
@@ -52,18 +52,19 @@ nonisolated struct PoseFrame: Codable, Sendable {
 
 /// Geometry shared by exercises that classify a joint angle.
 nonisolated enum PoseFeatures {
-    static func angle(_ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>) -> Float {
-        let u = a - b, v = c - b
-        let divisor = simd_length(u) * simd_length(v)
+    static func angle(_ first: SIMD2<Float>, _ vertex: SIMD2<Float>, _ last: SIMD2<Float>) -> Float {
+        let firstVector = first - vertex
+        let secondVector = last - vertex
+        let divisor = simd_length(firstVector) * simd_length(secondVector)
         guard divisor > 0.0001 else { return .nan }
-        return acos(max(-1, min(1, simd_dot(u, v) / divisor))) * 180 / .pi
+        return acos(max(-1, min(1, simd_dot(firstVector, secondVector) / divisor))) * 180 / .pi
     }
 }
 
 /// A low-latency adaptive filter for noisy normalized joint coordinates.
 /// It applies more smoothing while a joint is nearly still and responds more
 /// quickly as the joint moves.
-nonisolated private struct OneEuroFilter2D {
+private nonisolated struct OneEuroFilter2D {
     private var filtered: SIMD2<Float>?
     private var filteredDerivative: SIMD2<Float>?
     private var lastTimestamp: TimeInterval?
@@ -75,7 +76,7 @@ nonisolated private struct OneEuroFilter2D {
         guard let previous = filtered, let lastTimestamp else {
             filtered = value
             filteredDerivative = .zero
-            self.lastTimestamp = timestamp
+            lastTimestamp = timestamp
             return value
         }
 
@@ -121,11 +122,13 @@ nonisolated struct PoseStabilizer {
 
     mutating func stabilize(_ rawJoints: [BodyJoint: PoseJoint],
                             tracking trackedJoints: [BodyJoint],
-                            at timestamp: TimeInterval) -> [BodyJoint: PoseJoint] {
+                            at timestamp: TimeInterval) -> [BodyJoint: PoseJoint]
+    {
         var result: [BodyJoint: PoseJoint] = [:]
         for joint in trackedJoints {
             if let raw = rawJoints[joint], isValid(raw),
-               raw.confidence2D >= PoseDetectionParameters.minimumConfidence {
+               raw.confidence2D >= PoseDetectionParameters.minimumConfidence
+            {
                 var track = tracks[joint] ?? Track()
                 let position = track.filter.filter(raw.imagePoint, at: timestamp)
                 track.position = position
@@ -135,7 +138,8 @@ nonisolated struct PoseStabilizer {
                                           imagePoint: position,
                                           confidence2D: raw.confidence2D)
             } else if let track = tracks[joint],
-                      timestamp - track.lastObservedAt <= PoseDetectionParameters.jointHoldDuration {
+                      timestamp - track.lastObservedAt <= PoseDetectionParameters.jointHoldDuration
+            {
                 result[joint] = PoseJoint(position: track.position,
                                           imagePoint: track.position,
                                           confidence2D: 0)
@@ -148,6 +152,6 @@ nonisolated struct PoseStabilizer {
 
     private func isValid(_ joint: PoseJoint) -> Bool {
         joint.imagePoint.x.isFinite && joint.imagePoint.y.isFinite &&
-        (0.0...1.0).contains(joint.imagePoint.x) && (0.0...1.0).contains(joint.imagePoint.y)
+            (0.0 ... 1.0).contains(joint.imagePoint.x) && (0.0 ... 1.0).contains(joint.imagePoint.y)
     }
 }

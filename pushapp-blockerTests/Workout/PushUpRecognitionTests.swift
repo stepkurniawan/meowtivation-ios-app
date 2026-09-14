@@ -1,8 +1,8 @@
 import AVFoundation
 import Foundation
+@testable import pushapp_blocker
 import simd
 import Testing
-@testable import pushapp_blocker
 
 /// Synthetic camera-space motion. These prove the angle state machine, not Vision accuracy.
 nonisolated enum PushUpFixtures {
@@ -37,8 +37,8 @@ nonisolated enum PushUpFixtures {
             for (index, joint) in side.prefix(3).enumerated() {
                 let position = positions[index]
                 joints[joint] = PoseJoint(position: position,
-                    imagePoint: [0.4 + position.x * 0.3, 0.15 + position.y * 0.3],
-                    confidence2D: 0.95)
+                                          imagePoint: [0.4 + position.x * 0.3, 0.15 + position.y * 0.3],
+                                          confidence2D: 0.95)
             }
         }
         return PoseFrame(timestamp: time, joints: joints)
@@ -67,8 +67,8 @@ nonisolated enum PushUpFixtures {
             for (index, joint) in side.prefix(3).enumerated() {
                 let position = positions[index]
                 joints[joint] = PoseJoint(position: position,
-                    imagePoint: position,
-                    confidence2D: 0.95)
+                                          imagePoint: position,
+                                          confidence2D: 0.95)
             }
         }
         return PoseFrame(timestamp: time, joints: joints)
@@ -76,7 +76,8 @@ nonisolated enum PushUpFixtures {
 
     static func sequence(reps: Int = 3, duration: Double = 2.4,
                          start: Double = 1, amplitude: Float = 1,
-                         sampleFPS: Double = PoseDetectionParameters.targetFPS) -> [PoseFrame] {
+                         sampleFPS: Double = PoseDetectionParameters.targetFPS) -> [PoseFrame]
+    {
         let step = 1.0 / sampleFPS
         let total = Double(reps) * duration + 0.5
         return stride(from: 0.0, through: total, by: step).map { elapsed in
@@ -88,7 +89,9 @@ nonisolated enum PushUpFixtures {
 
     static func withConfidence(_ frame: PoseFrame, side: Int, confidence: Float) -> PoseFrame {
         var copy = frame
-        for joint in PushUp.armChains[side] { copy.joints[joint]?.confidence2D = confidence }
+        for joint in PushUp.armChains[side] {
+            copy.joints[joint]?.confidence2D = confidence
+        }
         return copy
     }
 
@@ -101,18 +104,23 @@ nonisolated enum PushUpFixtures {
         }
         return copy
     }
-
 }
 
+// These tests intentionally keep the complete push-up state-machine fixture in one type.
+// swiftlint:disable:next type_body_length
 struct PushUpRecognitionTests {
-    @Test func pushUpCameraTargetUsesTheCentreOfOneReliableArm() {
+    @Test func pushUpCameraTargetUsesTheCentreOfOneReliableArm() throws {
         var frame = PushUpFixtures.frame(contraction: 0, time: 1)
-        for joint in PushUp.armChains[1] { frame.joints[joint] = nil }
+        for joint in PushUp.armChains[1] {
+            frame.joints[joint] = nil
+        }
 
         let target = PushUp.cameraTarget(from: frame.joints)
         let arm = PushUp.armChains[0]
-        let expected = (frame.joints[arm[0]]!.imagePoint + frame.joints[arm[1]]!.imagePoint +
-                        frame.joints[arm[2]]!.imagePoint) / 3
+        let shoulder = try #require(frame.joints[arm[0]]?.imagePoint)
+        let elbow = try #require(frame.joints[arm[1]]?.imagePoint)
+        let wrist = try #require(frame.joints[arm[2]]?.imagePoint)
+        let expected = (shoulder + elbow + wrist) / 3
 
         #expect(target == expected)
     }
@@ -126,7 +134,9 @@ struct PushUpRecognitionTests {
 
         frame = PushUpFixtures.frame(contraction: 0, time: 1)
         for arm in PushUp.armChains {
-            for joint in arm { frame.joints[joint]?.confidence2D = 0.49 }
+            for joint in arm {
+                frame.joints[joint]?.confidence2D = 0.49
+            }
         }
         #expect(PushUp.cameraTarget(from: frame.joints) == nil)
     }
@@ -149,7 +159,7 @@ struct PushUpRecognitionTests {
     @Test func countsFastPushUpSampledAtThirtyFramesPerSecond() {
         var engine = PushUpFixtures.trackingEngine()
         let events = PushUpFixtures.sequence(reps: 1, duration: 0.4,
-                                               sampleFPS: PoseDetectionParameters.targetFPS)
+                                             sampleFPS: PoseDetectionParameters.targetFPS)
             .flatMap { engine.consume($0).reps }
 
         #expect(events.count == 1)
@@ -159,7 +169,7 @@ struct PushUpRecognitionTests {
         var stabilizer = PoseStabilizer()
         var engine = PushUpFixtures.trackingEngine()
         let frames = PushUpFixtures.sequence(reps: 3, duration: 0.4,
-                                               sampleFPS: PoseDetectionParameters.targetFPS).map { frame in
+                                             sampleFPS: PoseDetectionParameters.targetFPS).map { frame in
             var stabilized = frame
             stabilized.joints = stabilizer.stabilize(frame.joints, tracking: PushUp.trackedJoints, at: frame.timestamp)
             return stabilized
@@ -175,7 +185,7 @@ struct PushUpRecognitionTests {
         let frames = [
             PushUpFixtures.frame(contraction: 0, time: 1.1),
             PushUpFixtures.frame(contraction: 1, time: 1.25),
-            PushUpFixtures.frame(contraction: 0, time: 1.40)
+            PushUpFixtures.frame(contraction: 0, time: 1.40),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
@@ -192,7 +202,7 @@ struct PushUpRecognitionTests {
         let frames = [
             PushUpFixtures.frame(angle: 160, time: 1.1),
             PushUpFixtures.frame(angle: 90, time: 1.3),
-            PushUpFixtures.frame(angle: 160, time: 1.5)
+            PushUpFixtures.frame(angle: 160, time: 1.5),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
@@ -209,7 +219,7 @@ struct PushUpRecognitionTests {
         let frames = [
             PushUpFixtures.frame(contraction: 0, time: 1.1),
             PushUpFixtures.frame(contraction: 1, time: 1.4),
-            PushUpFixtures.frame(contraction: 0, time: 1.5)
+            PushUpFixtures.frame(contraction: 0, time: 1.5),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
@@ -222,7 +232,7 @@ struct PushUpRecognitionTests {
             PushUpFixtures.frame(angle: 30, time: 1.3),
             PushUpFixtures.frame(angle: 160, time: 1.5),
             PushUpFixtures.frame(angle: 30, time: 1.7),
-            PushUpFixtures.frame(angle: 160, time: 1.9)
+            PushUpFixtures.frame(angle: 160, time: 1.9),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 2)
@@ -235,7 +245,7 @@ struct PushUpRecognitionTests {
             PushUpFixtures.frame(angle: 30, time: 1.3),
             PushUpFixtures.frame(angle: 160, time: 1.5),
             PushUpFixtures.frame(angle: 160, time: 1.8),
-            PushUpFixtures.frame(angle: 160, time: 2.2)
+            PushUpFixtures.frame(angle: 160, time: 2.2),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
@@ -260,7 +270,7 @@ struct PushUpRecognitionTests {
         let frames = [
             PushUpFixtures.onlyArm(side, in: PushUpFixtures.frame(contraction: 0, time: 1.1)),
             PushUpFixtures.onlyArm(side, in: PushUpFixtures.frame(contraction: 1, time: 1.3)),
-            PushUpFixtures.onlyArm(side, in: PushUpFixtures.frame(contraction: 0, time: 1.5))
+            PushUpFixtures.onlyArm(side, in: PushUpFixtures.frame(contraction: 0, time: 1.5)),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
@@ -271,7 +281,7 @@ struct PushUpRecognitionTests {
         let frames = [
             PushUpFixtures.onlyArm(1, in: PushUpFixtures.frame(contraction: 0, time: 1.1)),
             PushUpFixtures.onlyArm(1, in: PushUpFixtures.frame(contraction: 1, time: 1.3)),
-            PushUpFixtures.onlyArm(1, in: PushUpFixtures.frame(contraction: 0, time: 1.5))
+            PushUpFixtures.onlyArm(1, in: PushUpFixtures.frame(contraction: 0, time: 1.5)),
         ]
 
         let updates = frames.map { engine.consume($0) }
@@ -285,7 +295,7 @@ struct PushUpRecognitionTests {
         let frames = [
             PushUpFixtures.frame(contraction: 0, time: 1.1),
             PushUpFixtures.frame(contraction: 1, time: 1.3),
-            PushUpFixtures.frame(contraction: 0, time: 1.5)
+            PushUpFixtures.frame(contraction: 0, time: 1.5),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
@@ -298,7 +308,7 @@ struct PushUpRecognitionTests {
             PushUpFixtures.frame(rightContraction: 1, leftContraction: 0, time: 1.3),
             PushUpFixtures.frame(rightContraction: 0, leftContraction: 0, time: 1.5),
             PushUpFixtures.frame(rightContraction: 0, leftContraction: 1, time: 1.55),
-            PushUpFixtures.frame(rightContraction: 0, leftContraction: 0, time: 1.7)
+            PushUpFixtures.frame(rightContraction: 0, leftContraction: 0, time: 1.7),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 1)
@@ -311,7 +321,7 @@ struct PushUpRecognitionTests {
             PushUpFixtures.frame(rightContraction: 1, leftContraction: 0, time: 1.3),
             PushUpFixtures.frame(rightContraction: 0, leftContraction: 0, time: 1.5),
             PushUpFixtures.frame(rightContraction: 0, leftContraction: 1, time: 1.65),
-            PushUpFixtures.frame(rightContraction: 0, leftContraction: 0, time: 1.85)
+            PushUpFixtures.frame(rightContraction: 0, leftContraction: 0, time: 1.85),
         ]
 
         #expect(frames.flatMap { engine.consume($0).reps }.count == 2)
@@ -321,18 +331,23 @@ struct PushUpRecognitionTests {
         var engine = PushUpFixtures.trackingEngine()
         _ = engine.consume(PushUpFixtures.frame(rightContraction: 0, leftContraction: 0, time: 1.1))
         _ = engine.consume(PushUpFixtures.frame(rightContraction: 1, leftContraction: 0, time: 1.3))
-        #expect(engine.consume(PushUpFixtures.onlyArm(1, in: PushUpFixtures.frame(contraction: 0, time: 1.4))).reps.isEmpty)
-        #expect(engine.consume(PushUpFixtures.onlyArm(1, in: PushUpFixtures.frame(contraction: 0, time: 1.66))).reps.isEmpty)
+        #expect(engine.consume(PushUpFixtures.onlyArm(1, in: PushUpFixtures.frame(contraction: 0, time: 1.4))).reps
+            .isEmpty)
+        #expect(engine.consume(PushUpFixtures.onlyArm(1, in: PushUpFixtures.frame(contraction: 0, time: 1.66))).reps
+            .isEmpty)
 
         let recovered = engine.consume(PushUpFixtures.frame(rightContraction: 0, leftContraction: 0, time: 1.7))
         #expect(recovered.reps.isEmpty)
         #expect(recovered.poseReady)
     }
 
-    @Test func missingShoulderElbowOrWristMakesPoseNotReady() {
+    @Test func missingShoulderElbowOrWristMakesPoseNotReady() throws {
         for joint in [BodyJoint.leftShoulder, .leftElbow, .leftWrist] {
             var frame = PushUpFixtures.frame(contraction: 0, time: 1)
-            let rightJoint = BodyJoint(rawValue: joint.rawValue.replacingOccurrences(of: "left", with: "right"))!
+            let rightJoint = try #require(BodyJoint(rawValue: joint.rawValue.replacingOccurrences(
+                of: "left",
+                with: "right"
+            )))
             frame.joints[joint] = nil
             frame.joints[rightJoint] = nil
             #expect(PushUpPose.sample(from: frame) == nil)
@@ -345,21 +360,21 @@ struct PushUpRecognitionTests {
         #expect(partial.flatMap { partialEngine.consume($0).reps }.isEmpty)
 
         var holdEngine = PushUpFixtures.trackingEngine()
-        let extended = (0..<45).map { PushUpFixtures.frame(contraction: 0, time: 1 + Double($0) / 15) }
-        let contracted = (0..<180).map { PushUpFixtures.frame(contraction: 1, time: 5 + Double($0) / 15) }
+        let extended = (0 ..< 45).map { PushUpFixtures.frame(contraction: 0, time: 1 + Double($0) / 15) }
+        let contracted = (0 ..< 180).map { PushUpFixtures.frame(contraction: 1, time: 5 + Double($0) / 15) }
         #expect((extended + contracted).flatMap { holdEngine.consume($0).reps }.isEmpty)
     }
 
     @Test func missingFramesDoNotBridgeARep() {
         var engine = PushUpFixtures.trackingEngine()
-        let frames = PushUpFixtures.sequence(reps: 1).filter { !(2.1...2.8).contains($0.timestamp) }
+        let frames = PushUpFixtures.sequence(reps: 1).filter { !(2.1 ... 2.8).contains($0.timestamp) }
         #expect(frames.flatMap { engine.consume($0).reps }.isEmpty)
     }
 
     @Test func missingPoseDoesNotBridgeARep() {
         var engine = PushUpFixtures.trackingEngine()
         let frames = PushUpFixtures.sequence(reps: 1).enumerated().map { index, frame in
-            (30...38).contains(index) ? PoseFrame(timestamp: frame.timestamp, joints: [:]) : frame
+            (30 ... 38).contains(index) ? PoseFrame(timestamp: frame.timestamp, joints: [:]) : frame
         }
         #expect(frames.flatMap { engine.consume($0).reps }.isEmpty)
     }
@@ -391,11 +406,23 @@ struct PushUpRecognitionTests {
         bent = PushUpFixtures.withConfidence(bent, side: 0, confidence: 0.98)
         #expect(engine.consume(bent).tracking == .findingPosition)
 
-        let early = PushUpFixtures.withConfidence(PushUpFixtures.frame(angle: 160, time: 0.5), side: 0, confidence: 0.98)
+        let early = PushUpFixtures.withConfidence(
+            PushUpFixtures.frame(angle: 160, time: 0.5),
+            side: 0,
+            confidence: 0.98
+        )
         #expect(engine.consume(early).tracking == .validatingPosition)
-        let halfway = PushUpFixtures.withConfidence(PushUpFixtures.frame(angle: 160, time: 1.0), side: 0, confidence: 0.98)
+        let halfway = PushUpFixtures.withConfidence(
+            PushUpFixtures.frame(angle: 160, time: 1.0),
+            side: 0,
+            confidence: 0.98
+        )
         #expect(!engine.consume(halfway).didStart)
-        let ready = PushUpFixtures.withConfidence(PushUpFixtures.frame(angle: 160, time: 1.5), side: 0, confidence: 0.98)
+        let ready = PushUpFixtures.withConfidence(
+            PushUpFixtures.frame(angle: 160, time: 1.5),
+            side: 0,
+            confidence: 0.98
+        )
         #expect(engine.consume(ready).didStart)
     }
 
@@ -414,10 +441,18 @@ struct PushUpRecognitionTests {
         var engine = PushUpRecognitionEngine()
         let first = PushUpFixtures.withConfidence(PushUpFixtures.frame(angle: 160, time: 0), side: 0, confidence: 0.98)
         var onlyRight = first
-        for joint in PushUp.armChains[1] { onlyRight.joints[joint] = nil }
+        for joint in PushUp.armChains[1] {
+            onlyRight.joints[joint] = nil
+        }
         #expect(engine.consume(onlyRight).tracking == .validatingPosition)
-        var shifted = PushUpFixtures.withConfidence(PushUpFixtures.frame(angle: 160, time: 0.5), side: 0, confidence: 0.98)
-        for joint in PushUp.armChains[1] { shifted.joints[joint] = nil }
+        var shifted = PushUpFixtures.withConfidence(
+            PushUpFixtures.frame(angle: 160, time: 0.5),
+            side: 0,
+            confidence: 0.98
+        )
+        for joint in PushUp.armChains[1] {
+            shifted.joints[joint] = nil
+        }
         for joint in PushUp.armChains[0] {
             shifted.joints[joint]?.position.x += 0.1
             shifted.joints[joint]?.imagePoint.x += 0.1
@@ -429,19 +464,30 @@ struct PushUpRecognitionTests {
 @MainActor private final class TestWorkoutSpeech: WorkoutSpeaking {
     var spoken: [String] = []
     var stops = 0
-    func say(_ text: String) { spoken.append(text) }
-    func stop() { stops += 1 }
+    func say(_ text: String) {
+        spoken.append(text)
+    }
+
+    func stop() {
+        stops += 1
+    }
 }
 
-nonisolated private final class TestWorkoutCamera: WorkoutCameraControlling {
+private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
     let session = AVCaptureSession()
     var generation = 0
     var stops = 0
     var poseConfigurationUpdates = 0
-    func start(generation: Int, rotation: Double) { self.generation = generation }
-    func stop() { stops += 1 }
-    func updateRotation(_ angle: Double) { }
-    func updatePoseConfiguration(_ configuration: WorkoutPoseConfiguration) {
+    func start(generation: Int, rotation _: Double) {
+        self.generation = generation
+    }
+
+    func stop() {
+        stops += 1
+    }
+
+    func updateRotation(_: Double) {}
+    func updatePoseConfiguration(_: WorkoutPoseConfiguration) {
         poseConfigurationUpdates += 1
     }
 }

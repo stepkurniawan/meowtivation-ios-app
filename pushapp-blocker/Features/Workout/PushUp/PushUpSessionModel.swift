@@ -2,6 +2,8 @@ import Combine // ObservableObject
 import Foundation
 
 @MainActor
+// This model remains ObservableObject because the view uses StateObject ownership.
+// swiftlint:disable:next observable_object_legacy
 final class WorkoutSessionModel: ObservableObject {
     @Published private(set) var repCount = 0
     @Published private(set) var poseReady = false
@@ -29,15 +31,20 @@ final class WorkoutSessionModel: ObservableObject {
     private var rotation = 90.0
     private var speech: any WorkoutSpeaking
     private var cameraStorage: (any WorkoutCameraControlling)!
-    var camera: any WorkoutCameraControlling { cameraStorage }
+    var camera: any WorkoutCameraControlling {
+        cameraStorage
+    }
 
     /// Compatibility for existing callers while the UI moves to the shared name.
-    var pushUpCount: Int { repCount }
+    var pushUpCount: Int {
+        repCount
+    }
 
     init(speech: (any WorkoutSpeaking)? = nil,
          cameraFactory: (@escaping @Sendable (Int, WorkoutCameraEvent) -> Void) -> any WorkoutCameraControlling = {
              WorkoutCamera(configuration: .automatic, onEvent: $0)
-         }) {
+         })
+    {
         self.speech = speech ?? WorkoutSpeech()
         cameraStorage = cameraFactory { [weak self] token, event in
             Task { @MainActor [weak self] in self?.receive(event, generation: token) }
@@ -68,9 +75,15 @@ final class WorkoutSessionModel: ObservableObject {
         cameraState = .idle
     }
 
-    func resume() { if hasStarted, !hasEnded { start() } }
+    func resume() {
+        if hasStarted, !hasEnded {
+            start()
+        }
+    }
 
-    func retry() { pause(); start() }
+    func retry() {
+        pause(); start()
+    }
 
     func end() {
         pause()
@@ -79,7 +92,9 @@ final class WorkoutSessionModel: ObservableObject {
 
     func toggleMute() {
         isMuted.toggle()
-        if isMuted { speech.stop() }
+        if isMuted {
+            speech.stop()
+        }
     }
 
     func updateRotation(_ angle: Double) {
@@ -104,10 +119,12 @@ final class WorkoutSessionModel: ObservableObject {
 
     // Internal for deterministic lifecycle tests. Generation rejects late callbacks
     // from permission requests, dismissed sessions, and interrupted camera work.
+    // Camera state, recognition, published UI state, and speech must update together.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     func receive(_ event: WorkoutCameraEvent, generation token: Int) {
         guard active, !hasEnded, token == generation else { return }
         switch event {
-        case .state(let state):
+        case let .state(state):
             cameraState = state
             if state != .running {
                 engine.resetTracking()
@@ -117,7 +134,7 @@ final class WorkoutSessionModel: ObservableObject {
                 analysisFPS = 0
                 speech.stop()
             }
-        case .frame(let frame, let milliseconds):
+        case let .frame(frame, milliseconds):
             guard cameraState == .running else { return }
             if let lastFrameAt, frame.timestamp > lastFrameAt {
                 analysisFPS = 0.8 * analysisFPS + 0.2 / (frame.timestamp - lastFrameAt)
@@ -159,11 +176,13 @@ final class WorkoutSessionModel: ObservableObject {
                 speech.say(repCount == 1 ? "\(title). \(repCount)" : "\(repCount)")
                 lastPromptAt = frame.timestamp
             } else if update.tracking == .ambiguous,
-                      frame.timestamp - lastPromptAt >= 1 {
+                      frame.timestamp - lastPromptAt >= 1
+            {
                 speech.say(update.tracking.message)
                 lastPromptAt = frame.timestamp
             } else if update.tracking == .waitingForJoints || update.tracking == .cameraMoving,
-                      frame.timestamp - lastPromptAt >= 8 {
+                      frame.timestamp - lastPromptAt >= 8
+            {
                 speech.say(update.tracking.message)
                 lastPromptAt = frame.timestamp
             }

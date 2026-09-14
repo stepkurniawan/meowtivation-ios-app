@@ -5,12 +5,12 @@
 //  Created by stephen on 01.09.26.
 //
 
-import SwiftUI
 import Combine
+import SwiftUI
 import UIKit
 
 @main
-struct pushapp_blockerApp: App {
+struct PushAppBlockerApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var blockedAppsStore = BlockedAppsStore()
 
@@ -19,11 +19,15 @@ struct pushapp_blockerApp: App {
             ContentView()
                 .environmentObject(blockedAppsStore)
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { // when the app becomes active, refresh the lock state to ensure it's up to date
+                    if phase ==
+                        .active
+                    { // when the app becomes active, refresh the lock state to ensure it's up to date
                         blockedAppsStore.refreshLockState()
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+                .onReceive(NotificationCenter.default
+                    .publisher(for: UIApplication.significantTimeChangeNotification))
+                { _ in
                     blockedAppsStore.refreshLockState()
                 }
         }

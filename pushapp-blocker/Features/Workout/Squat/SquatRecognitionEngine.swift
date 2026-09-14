@@ -18,7 +18,7 @@ nonisolated struct SquatRecognitionUpdate: Sendable {
     var reps: [SquatRepEvent] = []
 }
 
-nonisolated private struct SquatCycleDetector {
+private nonisolated struct SquatCycleDetector {
     enum Phase { case waiting, extended, contracted }
     var phase = Phase.waiting
     var startedAt = 0.0
@@ -26,20 +26,24 @@ nonisolated private struct SquatCycleDetector {
     mutating func consume(_ raw: SquatSample, at time: TimeInterval) -> Bool {
         let angle = raw.angle
         if phase != .waiting,
-           time - startedAt > SquatRecognitionParameters.maximumCycleDuration {
+           time - startedAt > SquatRecognitionParameters.maximumCycleDuration
+        {
             phase = .waiting
         }
 
         switch phase {
         case .waiting:
-            guard angle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle
+            else { return false }
             phase = .extended
             startedAt = time
         case .extended:
-            guard angle <= SquatRecognitionParameters.maximumContractedAngle + SquatRecognitionParameters.angleTolerance else { return false }
+            guard angle <= SquatRecognitionParameters.maximumContractedAngle + SquatRecognitionParameters
+                .angleTolerance else { return false }
             phase = .contracted
         case .contracted:
-            guard angle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle else { return false }
+            guard angle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle
+            else { return false }
             let duration = time - startedAt
             let valid = duration >= SquatRecognitionParameters.minimumCycleDuration &&
                 duration <= SquatRecognitionParameters.maximumCycleDuration
@@ -87,6 +91,8 @@ nonisolated struct SquatRecognitionEngine {
         // Preserve the event sequence across resets to prevent duplicate credits.
     }
 
+    // The squat state machine keeps dropout, calibration, and rep transitions atomic.
+    // swiftlint:disable:next function_body_length
     mutating func consume(_ frame: PoseFrame) -> SquatRecognitionUpdate {
         guard frame.timestamp.isFinite else {
             resetTracking()
@@ -96,7 +102,8 @@ nonisolated struct SquatRecognitionEngine {
             return SquatRecognitionUpdate(tracking: .findingPosition)
         }
         if let lastTimestamp,
-           frame.timestamp - lastTimestamp > SquatRecognitionParameters.maximumFrameGap {
+           frame.timestamp - lastTimestamp > SquatRecognitionParameters.maximumFrameGap
+        {
             resetTracking()
             self.lastTimestamp = frame.timestamp
             return SquatRecognitionUpdate(tracking: .findingPosition)
@@ -114,7 +121,7 @@ nonisolated struct SquatRecognitionEngine {
         }
 
         var reps: [SquatRepEvent] = []
-        let samplesBySide: [Int : SquatSample] = Dictionary(uniqueKeysWithValues: candidates.map { ($0.side, $0) })
+        let samplesBySide: [Int: SquatSample] = Dictionary(uniqueKeysWithValues: candidates.map { ($0.side, $0) })
         for side: Range<Array<[BodyJoint]>.Index>.Element in Squat.legChains.indices {
             guard let sample: SquatSample = samplesBySide[side] else {
                 let lostAt: TimeInterval = legLostAt[side] ?? frame.timestamp
@@ -130,7 +137,9 @@ nonisolated struct SquatRecognitionEngine {
             let completed = detector.consume(sample, at: frame.timestamp)
             detectors[side] = detector
             guard completed,
-                  lastRepAt.map({ frame.timestamp - $0 >= SquatRecognitionParameters.legRepDeduplicationDuration }) ?? true else {
+                  lastRepAt
+                  .map({ frame.timestamp - $0 >= SquatRecognitionParameters.legRepDeduplicationDuration }) ?? true
+            else {
                 continue
             }
             nextID += 1
@@ -147,7 +156,8 @@ nonisolated struct SquatRecognitionEngine {
     }
 
     private mutating func calibrate(_ candidates: [SquatSample],
-                                    at timestamp: TimeInterval) -> SquatRecognitionUpdate {
+                                    at timestamp: TimeInterval) -> SquatRecognitionUpdate
+    {
         let extended = candidates.filter {
             $0.angle + SquatRecognitionParameters.angleTolerance >= SquatRecognitionParameters.minimumRecoveryAngle
         }
