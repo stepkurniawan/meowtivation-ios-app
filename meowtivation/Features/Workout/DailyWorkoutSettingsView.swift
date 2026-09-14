@@ -30,10 +30,18 @@ struct DailyWorkoutSettingsView: View {
                 Text("Each target can be from 1 to 100 recognized repetitions.")
             }
 
-            Section("App Blocking") {
+            Section {
                 NavigationLink("Blocked Apps") {
                     BlockedAppsView()
                 }
+
+                TextField("Your name (optional)", text: $store.userName)
+                    .textContentType(.givenName)
+                    .autocorrectionDisabled()
+            } header: {
+                Text("App Blocking")
+            } footer: {
+                Text("Used in the focus message shown when a blocked app is opened.")
             }
         }
         .navigationTitle("Settings")

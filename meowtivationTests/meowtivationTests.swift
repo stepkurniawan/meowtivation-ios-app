@@ -11,6 +11,29 @@ import Foundation
 import Testing
 
 struct MeowtivationTests {
+    @Test func shieldGreetingTrimsNamesAndFallsBackWhenMissing() {
+        #expect(ShieldMessage.greeting(for: nil) == "Stay focused!")
+        #expect(ShieldMessage.greeting(for: "  \n ") == "Stay focused!")
+        #expect(ShieldMessage.greeting(for: "  Miso  ") == "Stay focused, Miso!")
+    }
+
+    @Test func shieldPrimaryActionOpensMeowtivation() {
+        #expect(ShieldActionResponseFactory.response(for: .primaryButtonPressed) == .openParentalControlsApp)
+    }
+
+    @MainActor
+    @Test func userNamePersistsInTheSharedDefaultsStore() throws {
+        let suiteName = "DailyLockTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = BlockedAppsStore(defaults: defaults, startMonitoring: {})
+        store.userName = "Miso"
+
+        let reopenedStore = BlockedAppsStore(defaults: defaults, startMonitoring: {})
+        #expect(reopenedStore.userName == "Miso")
+    }
+
     @MainActor
     @Test func monitorReadsSavedCompletionWithoutOpeningTheApp() throws {
         let suiteName = "DailyLockTests.\(UUID().uuidString)"

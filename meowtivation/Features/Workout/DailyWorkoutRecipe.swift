@@ -14,8 +14,8 @@ nonisolated struct DailyExerciseTarget: Codable, Equatable, Identifiable, Sendab
 /// The ordered exercise list the user must complete before the cat cafe can open.
 nonisolated struct DailyWorkoutRecipe: Codable, Equatable, Sendable {
     static let defaultValue = DailyWorkoutRecipe(entries: [
-        DailyExerciseTarget(exercise: .pushUp, target: 10, isEnabled: true),
-        DailyExerciseTarget(exercise: .squat, target: 20, isEnabled: true),
+        DailyExerciseTarget(exercise: .pushUp, target: 5, isEnabled: true),
+        DailyExerciseTarget(exercise: .squat, target: 5, isEnabled: true),
     ])
 
     var entries: [DailyExerciseTarget]

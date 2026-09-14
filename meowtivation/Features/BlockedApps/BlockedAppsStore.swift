@@ -18,6 +18,11 @@ final class BlockedAppsStore: ObservableObject {
     @Published private(set) var pendingDailyWorkoutRecipe: DailyWorkoutRecipe?
     @Published private(set) var dailyProgress: DailyWorkoutProgress
     @Published private(set) var isCafeOpen = false
+    @Published var userName: String {
+        didSet {
+            defaults.set(userName, forKey: AppSettings.userNameKey)
+        }
+    }
 
     @Published var selection: FamilyActivitySelection {
         didSet {
@@ -64,6 +69,7 @@ final class BlockedAppsStore: ObservableObject {
         dailyWorkoutRecipe = Self.recipe(from: sharedDefaults)
         pendingDailyWorkoutRecipe = Self.pendingRecipe(from: sharedDefaults)
         dailyProgress = Self.progress(from: sharedDefaults, now: now(), calendar: calendar)
+        userName = sharedDefaults.string(forKey: AppSettings.userNameKey) ?? ""
 
         refreshLockState()
         if defaults == nil {
