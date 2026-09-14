@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import UIKit
 
@@ -11,6 +12,7 @@ struct WorkoutView: View {
     private static let developerSequence: [TapSide] = [.left, .right, .left, .right, .left, .right]
 
     @StateObject private var model: WorkoutSessionModel
+    private let mode: WorkoutSessionMode
     @EnvironmentObject private var store: BlockedAppsStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -21,8 +23,9 @@ struct WorkoutView: View {
     @State private var completionError: String?
     @ScaledMetric(relativeTo: .largeTitle) private var dailyCountSize = 52
 
-    init(exercise: WorkoutExercise) {
+    init(exercise: WorkoutExercise, mode: WorkoutSessionMode = .daily) {
         _model = StateObject(wrappedValue: WorkoutSessionModel(exercise: exercise))
+        self.mode = mode
     }
 
     private var activeTitle: String {
@@ -112,7 +115,14 @@ struct WorkoutView: View {
             developerTapProgress = []
             lastDeveloperTap = nil
             developerMode = false
-            model.pause()
+            WorkoutDebugLog.lifecycle.info(
+                "WorkoutView onDisappear; ended=\(model.hasEnded, privacy: .public)"
+            )
+            // Ending the session already pauses the camera. Only pause here when
+            // the view disappears before the session has ended.
+            if !model.hasEnded {
+                model.pause()
+            }
             UIApplication.shared.isIdleTimerDisabled = false
         }
     }
@@ -132,7 +142,9 @@ struct WorkoutView: View {
                     "Hold your starting position still until Start! appears, then begin."
                 )
                 Text(
-                    "Video stays on your phone and is not saved. Completing today’s recipe opens the cat cafe."
+                    mode == .extra
+                        ? "Video stays on your phone and is not saved. End the workout whenever you are ready."
+                        : "Video stays on your phone and is not saved. Completing today’s recipe opens the cat cafe."
                 )
                 .font(.footnote).foregroundStyle(.secondary)
                 Button("Start Counting") { model.start() }
@@ -214,12 +226,28 @@ struct WorkoutView: View {
             Text("Today")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            Text("\(store.completedRepetitions(for: model.exercise)) / \(activeDailyTarget)")
-                .font(.system(size: dailyCountSize, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .accessibilityLabel(
-                    "\(store.completedRepetitions(for: model.exercise)) of \(activeDailyTarget) daily repetitions"
-                )
+            if mode == .extra {
+                Text("This session")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text("\(model.repCount)")
+                    .font(.system(size: dailyCountSize, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .accessibilityLabel("\(model.repCount) reps this session")
+                Text("Today’s total: \(store.completedRepetitions(for: model.exercise))")
+                    .font(.headline)
+                    .monospacedDigit()
+                    .accessibilityLabel(
+                        "\(store.completedRepetitions(for: model.exercise)) \(activeTitle.lowercased()) reps today"
+                    )
+            } else {
+                Text("\(store.completedRepetitions(for: model.exercise)) / \(activeDailyTarget)")
+                    .font(.system(size: dailyCountSize, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .accessibilityLabel(
+                        "\(store.completedRepetitions(for: model.exercise)) of \(activeDailyTarget) daily repetitions"
+                    )
+            }
             Text(model.tracking.message(for: model.exercise)).font(.callout).multilineTextAlignment(.center)
             if model.startCueVisible {
                 Text("Start!").font(.title.bold()).foregroundStyle(.green)
@@ -282,14 +310,20 @@ struct WorkoutView: View {
     private var summary: some View {
         VStack(spacing: 24) {
             Image(systemName: "figure.strengthtraining.traditional").font(.system(size: 60))
-            Text(store.hasCompletedDailyWorkout ? "Daily recipe complete" : "Session complete").font(.title.bold())
+            Text(mode == .extra || !store.hasCompletedDailyWorkout ? "Session complete" : "Daily recipe complete")
+                .font(.title.bold())
             countCard
             dailyProgress
             if let completionError {
                 Text(completionError).foregroundStyle(.red).multilineTextAlignment(.center)
                 Button("Try Again") { retryCompletion() }.buttonStyle(.borderedProminent)
             }
-            Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
+            Button("Done") {
+                WorkoutDebugLog.lifecycle.info("Workout summary Done tapped")
+                dismiss()
+                WorkoutDebugLog.lifecycle.info("Workout summary dismiss() returned")
+            }
+            .buttonStyle(.borderedProminent)
         }.padding()
     }
 
@@ -313,7 +347,7 @@ struct WorkoutView: View {
     private var dailyProgress: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(store.dailyWorkoutRecipe.entries) { entry in
-                if entry.isEnabled {
+                if entry.isEnabled || mode == .extra {
                     Text("\(entry.exercise.title): \(store.completedRepetitions(for: entry.exercise))/\(entry.target)")
                         .monospacedDigit()
                 }
@@ -325,6 +359,11 @@ struct WorkoutView: View {
     }
 
     private func handleRecognizedRep() {
+        if mode == .extra {
+            store.recordExtraWorkoutRep(for: model.exercise)
+            return
+        }
+
         do {
             try store.recordRecognizedRep(for: model.exercise)
             if store.hasCompletedDailyWorkout {

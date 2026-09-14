@@ -540,6 +540,10 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
         model.end()
         #expect(model.hasEnded)
         #expect(camera.stops > 0)
+
+        let stopsAfterEnd = camera.stops
+        model.pause()
+        #expect(camera.stops == stopsAfterEnd)
     }
 
     @Test func sessionShowsAndSpeaksTheStartCueOnlyAfterCalibration() {

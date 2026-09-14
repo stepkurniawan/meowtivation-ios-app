@@ -1,5 +1,6 @@
 import Combine // ObservableObject
 import Foundation
+import OSLog
 
 @MainActor
 // This model remains ObservableObject because the view uses StateObject ownership.
@@ -61,16 +62,25 @@ final class WorkoutSessionModel: ObservableObject {
     }
 
     func pause() {
+        let wasActive = active
+        WorkoutDebugLog.lifecycle.info(
+            "Session pause requested; active=\(wasActive, privacy: .public), ended=\(hasEnded, privacy: .public)"
+        )
         active = false
         generation += 1
-        camera.stop()
-        speech.stop()
+        if wasActive {
+            camera.stop()
+            speech.stop()
+        }
         engine.resetTracking()
         resetPublishedTracking()
         latestFrame = nil
         lastFrameAt = nil
         analysisFPS = 0
         cameraState = .idle
+        WorkoutDebugLog.lifecycle.info(
+            "Session pause state updated; cameraStopQueued=\(wasActive, privacy: .public)"
+        )
     }
 
     func resume() {
@@ -129,7 +139,7 @@ final class WorkoutSessionModel: ObservableObject {
     // Internal for deterministic lifecycle tests. Generation rejects late callbacks
     // from permission requests, dismissed sessions, and interrupted camera work.
     // Camera state, recognition, published UI state, and speech must update together.
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
+    // swiftlint:disable:next cyclomatic_complexity
     func receive(_ event: WorkoutCameraEvent, generation token: Int) {
         guard active, !hasEnded, token == generation else { return }
         switch event {

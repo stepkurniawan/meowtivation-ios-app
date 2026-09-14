@@ -6,8 +6,15 @@
 //
 
 import FamilyControls
+import OSLog
 import SwiftUI
 import UIKit
+
+private struct BlockingStatus {
+    let title: String
+    let symbol: String
+    let tint: Color
+}
 
 struct LandingView: View {
     private enum TapSide {
@@ -33,6 +40,8 @@ struct LandingView: View {
     @State private var commandError: String?
     @State private var isLandingVisible = false
     @State private var selectedExercise: WorkoutExercise?
+    @State private var selectedWorkoutMode: WorkoutSessionMode = .daily
+    @State private var showsExerciseChooser = false
     @State private var showsOpenCafe = false
 
     var body: some View {
@@ -96,16 +105,31 @@ struct LandingView: View {
                 Text(commandError ?? "Unable to change restrictions.")
             }
             .fullScreenCover(item: $selectedExercise, onDismiss: {
-                setCafeOpen(store.isCafeOpen, animated: store.isCafeOpen)
-            }) { exercise in
-                WorkoutView(exercise: exercise)
+                let storeCafeOpen = store.isCafeOpen
+                let visibleCafeOpen = showsOpenCafe
+                WorkoutDebugLog.lifecycle.info(
+                    "LandingView fullScreenCover dismissed; storeCafeOpen=\(storeCafeOpen, privacy: .public)"
+                )
+                WorkoutDebugLog.lifecycle.info(
+                    "LandingView fullScreenCover dismissed; visibleCafeOpen=\(visibleCafeOpen, privacy: .public)"
+                )
+                selectedWorkoutMode = .daily
+                setCafeOpen(storeCafeOpen, animated: true)
+                WorkoutDebugLog.lifecycle.info("LandingView fullScreenCover onDismiss finished")
+            }, content: { exercise in
+                WorkoutView(exercise: exercise, mode: selectedWorkoutMode)
+            })
+            .confirmationDialog("Choose an exercise", isPresented: $showsExerciseChooser) {
+                ForEach(WorkoutExercise.allCases) { exercise in
+                    Button(exercise.title) {
+                        select(exercise, mode: .extra)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Choose an exercise for an extra workout.")
             }
         }
-    }
-
-    private func resetTapProgress() {
-        tapProgress = []
-        lastTap = nil
     }
 
     private var hasBlockedApps: Bool {
@@ -123,14 +147,14 @@ struct LandingView: View {
         !store.hasCompletedDailyWorkout && store.isDailyWorkoutRecipeDone
     }
 
-    private var blockingStatus: (title: String, symbol: String, tint: Color) {
+    private var blockingStatus: BlockingStatus {
         if !hasBlockedApps {
-            return ("No apps selected", "lock.open", .secondary)
+            return BlockingStatus(title: "No apps selected", symbol: "lock.open", tint: .secondary)
         }
         if store.isLocked {
-            return ("Apps are blocked", "lock.fill", .primary)
+            return BlockingStatus(title: "Apps are blocked", symbol: "lock.fill", tint: .primary)
         }
-        return ("Apps unlocked for today", "lock.open.fill", .green)
+        return BlockingStatus(title: "Apps unlocked for today", symbol: "lock.open.fill", tint: .green)
     }
 
     @ViewBuilder
@@ -203,8 +227,27 @@ struct LandingView: View {
         .accessibilityHidden(true)
     }
 
+    private var cafeBackground: some View {
+        ZStack {
+            cafeImage(named: "CatCafeClosed")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .opacity(showsOpenCafe ? 0 : 1)
+            cafeImage(named: "CatCafeOpen")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .opacity(showsOpenCafe ? 1 : 0)
+                .scaleEffect(showsOpenCafe && !reduceMotion ? 1.02 : 1)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private extension LandingView {
     @ViewBuilder
-    private var landingCardContainer: some View {
+    var landingCardContainer: some View {
         if dynamicTypeSize.isAccessibilitySize {
             ScrollView {
                 landingCard
@@ -219,7 +262,7 @@ struct LandingView: View {
         }
     }
 
-    private var landingCard: some View {
+    var landingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(blockingStatus.title, systemImage: blockingStatus.symbol)
                 .font(.headline)
@@ -266,6 +309,7 @@ struct LandingView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
+                StartAnotherWorkoutButton { showsExerciseChooser = true }
             } else if store.isCafeOpen {
                 Label("Cafe open for today", systemImage: "checkmark.circle.fill")
                     .font(.title3.bold())
@@ -273,12 +317,14 @@ struct LandingView: View {
                 Text("Today’s recipe is complete. Enjoy your unlocked time.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                StartAnotherWorkoutButton { showsExerciseChooser = true }
             } else if store.hasCompletedDailyWorkout {
                 Text("Workout complete")
                     .font(.title3.bold())
                 Text("Today’s recipe is complete. App blocking is still active.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                StartAnotherWorkoutButton { showsExerciseChooser = true }
             }
         }
         .frame(maxWidth: 560, alignment: .leading)
@@ -286,7 +332,12 @@ struct LandingView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private func handleCornerTap(_ side: TapSide) {
+    func resetTapProgress() {
+        tapProgress = []
+        lastTap = nil
+    }
+
+    func handleCornerTap(_ side: TapSide) {
         guard isLandingVisible, scenePhase == .active, selectedExercise == nil,
               commandError == nil else { return }
         let timestamp = ProcessInfo.processInfo.systemUptime
@@ -315,30 +366,13 @@ struct LandingView: View {
         }
     }
 
-    private var cafeBackground: some View {
-        ZStack {
-            cafeImage(named: "CatCafeClosed")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-                .opacity(showsOpenCafe ? 0 : 1)
-            cafeImage(named: "CatCafeOpen")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-                .opacity(showsOpenCafe ? 1 : 0)
-                .scaleEffect(showsOpenCafe && !reduceMotion ? 1.02 : 1)
-        }
-        .accessibilityHidden(true)
-    }
-
-    private func startWorkout() {
+    func startWorkout() {
         if let exercise = store.nextRecipeExercise {
-            select(exercise)
+            select(exercise, mode: .daily)
         }
     }
 
-    private func retryUnlocking() {
+    func retryUnlocking() {
         do {
             try store.retryDailyWorkoutRecipeCompletion()
         } catch {
@@ -346,13 +380,17 @@ struct LandingView: View {
         }
     }
 
-    private func select(_ exercise: WorkoutExercise) {
+    func select(_ exercise: WorkoutExercise, mode: WorkoutSessionMode) {
         resetTapProgress()
+        selectedWorkoutMode = mode
         selectedExercise = exercise
     }
 
-    private func setCafeOpen(_ opens: Bool, animated: Bool) {
-        if animated, !reduceMotion {
+    func setCafeOpen(_ opens: Bool, animated: Bool) {
+        guard opens != showsOpenCafe else { return }
+
+        let shouldAnimateOpening = opens && animated && !reduceMotion
+        if shouldAnimateOpening {
             withAnimation(.easeInOut(duration: 0.7)) {
                 showsOpenCafe = opens
             }
@@ -361,9 +399,22 @@ struct LandingView: View {
         }
     }
 
-    private func cafeImage(named name: String) -> Image {
+    func cafeImage(named name: String) -> Image {
         guard let image = UIImage(named: name) else { return Image("LandingBackground") }
         return Image(uiImage: image)
+    }
+}
+
+private struct StartAnotherWorkoutButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Start Another Workout", systemImage: "figure.run")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
     }
 }
 

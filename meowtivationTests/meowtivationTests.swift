@@ -21,7 +21,9 @@ struct MeowtivationTests {
     @Test func shieldPrimaryActionOpensMeowtivation() {
         #expect(ShieldActionResponseFactory.response(for: .primaryButtonPressed) == .openParentalControlsApp)
     }
+}
 
+extension MeowtivationTests {
     @MainActor
     @Test func userNamePersistsInTheSharedDefaultsStore() throws {
         let suiteName = "DailyLockTests.\(UUID().uuidString)"
@@ -215,7 +217,9 @@ struct MeowtivationTests {
         #expect(!store.isLocked && store.monitoringError == nil)
         #expect(defaults.object(forKey: DailyBlocking.workoutCompletionKey) == nil)
     }
+}
 
+extension MeowtivationTests {
     @MainActor
     @Test func dailyWorkoutRecipePersistsProgressOrdersExercisesAndResetsTomorrow() throws {
         let suite = "DailyWorkoutRecipeTests.\(UUID().uuidString)"
@@ -247,6 +251,41 @@ struct MeowtivationTests {
         #expect(reopened.completedRepetitions(for: .pushUp) == 0)
         #expect(reopened.nextRecipeExercise == .pushUp)
         #expect(!reopened.isCafeOpen)
+    }
+
+    @MainActor
+    @Test func extraWorkoutRepsPersistForAnyExerciseWithoutChangingCompletion() throws {
+        let suite = "ExtraWorkoutTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        var now = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 14, hour: 12)))
+        let store = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
+
+        store.setExercise(.squat, isEnabled: false)
+        store.setTarget(1, for: .pushUp)
+        try store.recordRecognizedRep(for: .pushUp)
+        #expect(store.hasCompletedDailyWorkout)
+        let lockStateAfterCompletion = store.isLocked
+
+        store.recordExtraWorkoutRep(for: .squat)
+        store.recordExtraWorkoutRep(for: .pushUp)
+        #expect(store.completedRepetitions(for: .squat) == 1)
+        #expect(store.completedRepetitions(for: .pushUp) == 2)
+        #expect(store.hasCompletedDailyWorkout)
+        #expect(store.isLocked == lockStateAfterCompletion)
+
+        let reopened = BlockedAppsStore(defaults: defaults, now: { now }, calendar: calendar, startMonitoring: {})
+        #expect(reopened.completedRepetitions(for: .squat) == 1)
+        #expect(reopened.completedRepetitions(for: .pushUp) == 2)
+        #expect(reopened.hasCompletedDailyWorkout)
+
+        now = now.addingTimeInterval(24 * 60 * 60)
+        reopened.refreshLockState()
+        #expect(reopened.completedRepetitions(for: .squat) == 0)
+        #expect(reopened.completedRepetitions(for: .pushUp) == 0)
+        #expect(!reopened.hasCompletedDailyWorkout)
     }
 
     @MainActor

@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreMotion
 import Foundation
+import OSLog
 import simd
 import Vision
 
@@ -123,12 +124,21 @@ final nonisolated class WorkoutCamera: NSObject, WorkoutCameraControlling, AVCap
     }
 
     func stop() {
+        let requestedAt = ContinuousClock.now
+        WorkoutDebugLog.lifecycle.info("Camera stop requested")
         queue.async { [self] in
+            WorkoutDebugLog.lifecycle.info("Camera stop started on capture queue")
             active = false
             motion.stopDeviceMotionUpdates()
             if session.isRunning {
+                WorkoutDebugLog.lifecycle.info("Camera stopRunning started")
                 session.stopRunning()
+                WorkoutDebugLog.lifecycle.info("Camera stopRunning finished")
             }
+            let durationMilliseconds = WorkoutDebugLog.elapsedMilliseconds(since: requestedAt)
+            WorkoutDebugLog.lifecycle.info(
+                "Camera stop finished; durationMs=\(durationMilliseconds, privacy: .public)"
+            )
         }
     }
 

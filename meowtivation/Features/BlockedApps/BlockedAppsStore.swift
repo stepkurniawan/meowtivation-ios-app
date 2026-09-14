@@ -2,6 +2,7 @@ import Combine
 import FamilyControls
 import Foundation
 import ManagedSettings
+import OSLog
 
 @MainActor
 // FamilyControls state is published through the existing SwiftUI StateObject integration.
@@ -176,23 +177,6 @@ final class BlockedAppsStore: ObservableObject {
         refreshLockState()
     }
 
-    func refreshLockState() {
-        if isAuthorized {
-            do {
-                try ensureDailyReset()
-            } catch {
-                // ensureDailyReset publishes the error for the screen to display.
-            }
-        }
-        let date = now()
-        refreshRecipeIfNeeded(at: date)
-        refreshProgressIfNeeded(at: date)
-        hasDeveloperOverride = DailyBlocking.developerOverride(in: defaults, now: date, calendar: calendar) != nil
-        isLocked = DailyBlocking.isLocked(in: defaults, now: date, calendar: calendar)
-        isCafeOpen = DailyBlocking.hasCompletedDailyWorkout(in: defaults, now: date, calendar: calendar) && !isLocked
-        DailyBlocking.apply(selection: selection, isLocked: isLocked, to: managedSettings)
-    }
-
     func requestAuthorization() async throws {
         if !isAuthorized {
             try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
@@ -298,5 +282,45 @@ final class BlockedAppsStore: ObservableObject {
             monitoringError = error.localizedDescription
             throw error
         }
+    }
+}
+
+extension BlockedAppsStore {
+    /// Saves a rep from an extra workout without changing the completed recipe or lock state.
+    func recordExtraWorkoutRep(for exercise: WorkoutExercise) {
+        refreshRecipeIfNeeded(at: now())
+        guard isDailyWorkoutRecipeDone else { return }
+        refreshProgressIfNeeded()
+        dailyProgress.repetitions[exercise, default: 0] += 1
+        saveProgress()
+    }
+
+    func refreshLockState() {
+        let startedAt = ContinuousClock.now
+        WorkoutDebugLog.lifecycle.info("BlockedAppsStore refreshLockState started")
+        if isAuthorized {
+            do {
+                try ensureDailyReset()
+            } catch {
+                // ensureDailyReset publishes the error for the screen to display.
+            }
+        }
+        let date = now()
+        refreshRecipeIfNeeded(at: date)
+        refreshProgressIfNeeded(at: date)
+        hasDeveloperOverride = DailyBlocking.developerOverride(in: defaults, now: date, calendar: calendar) != nil
+        isLocked = DailyBlocking.isLocked(in: defaults, now: date, calendar: calendar)
+        isCafeOpen = DailyBlocking.hasCompletedDailyWorkout(in: defaults, now: date, calendar: calendar) && !isLocked
+        DailyBlocking.apply(selection: selection, isLocked: isLocked, to: managedSettings)
+        let durationMilliseconds = WorkoutDebugLog.elapsedMilliseconds(since: startedAt)
+        WorkoutDebugLog.lifecycle.info(
+            "BlockedAppsStore refreshLockState finished; durationMs=\(durationMilliseconds, privacy: .public)"
+        )
+        WorkoutDebugLog.lifecycle.info(
+            "BlockedAppsStore refreshLockState state; locked=\(isLocked, privacy: .public)"
+        )
+        WorkoutDebugLog.lifecycle.info(
+            "BlockedAppsStore refreshLockState finished; cafeOpen=\(isCafeOpen, privacy: .public)"
+        )
     }
 }

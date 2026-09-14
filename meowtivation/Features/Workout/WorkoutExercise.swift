@@ -32,6 +32,12 @@ nonisolated enum WorkoutExercise: String, CaseIterable, Codable, Hashable, Ident
     }
 }
 
+/// The reason a workout session was started, which controls how recognized reps are recorded.
+nonisolated enum WorkoutSessionMode: Equatable, Sendable {
+    case daily
+    case extra
+}
+
 nonisolated enum WorkoutTrackingState: Equatable, Sendable {
     case findingPosition, validatingPosition, ready, tracking
     case waitingForJoints, cameraMoving
