@@ -23,14 +23,28 @@ final class MeowtivationUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testWorkoutChooserOpensTheSelectedExerciseSetup() throws {
         let app = XCUIApplication()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+        let startWorkout = app.buttons["Start Workout"]
+        XCTAssertTrue(startWorkout.waitForExistence(timeout: 2))
+        startWorkout.tap()
+        XCTAssertTrue(app.buttons["Push-up"].exists)
+        XCTAssertTrue(app.buttons["Squat"].exists)
+
+        app.buttons["Cancel"].tap()
+        XCTAssertFalse(app.buttons["Push-up"].exists)
+
+        startWorkout.tap()
+        app.buttons["Squat"].tap()
+        XCTAssertTrue(app.staticTexts["Squat setup"].waitForExistence(timeout: 2))
+
+        app.buttons["Done"].tap()
+        XCTAssertTrue(startWorkout.waitForExistence(timeout: 2))
+        startWorkout.tap()
+        app.buttons["Push-up"].tap()
+        XCTAssertTrue(app.staticTexts["Push-up setup"].waitForExistence(timeout: 2))
     }
 
     @MainActor

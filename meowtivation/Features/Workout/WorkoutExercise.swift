@@ -1,10 +1,14 @@
 import Foundation
 import simd
 
-/// The exercises supported by the automatic workout session.
-nonisolated enum WorkoutExercise: Equatable, Sendable {
+/// The exercises a user can choose for a workout session.
+nonisolated enum WorkoutExercise: String, CaseIterable, Codable, Hashable, Identifiable, Sendable {
     case pushUp
     case squat
+
+    var id: Self {
+        self
+    }
 
     var title: String {
         switch self {
@@ -30,17 +34,16 @@ nonisolated enum WorkoutExercise: Equatable, Sendable {
 
 nonisolated enum WorkoutTrackingState: Equatable, Sendable {
     case findingPosition, validatingPosition, ready, tracking
-    case waitingForJoints, cameraMoving, ambiguous
+    case waitingForJoints, cameraMoving
 
-    var message: String {
+    func message(for exercise: WorkoutExercise) -> String {
         switch self {
-        case .findingPosition: "Get into a push-up starting position."
+        case .findingPosition: "Get into a \(exercise.title.lowercased()) starting position."
         case .validatingPosition: "Hold still. Checking your position."
-        case .ready: "Start a push-up."
+        case .ready: "Start a \(exercise.title.lowercased())."
         case .tracking: "Tracking your workout"
         case .waitingForJoints: "Keep the required body joints visible."
         case .cameraMoving: "Keep the phone still against the wall."
-        case .ambiguous: "Keep your movement clear."
         }
     }
 }
@@ -53,10 +56,59 @@ nonisolated struct WorkoutRepEvent: Identifiable, Sendable {
 nonisolated struct WorkoutRecognitionUpdate: Sendable {
     var tracking: WorkoutTrackingState
     var poseReady = false
-    var selectedExercise: WorkoutExercise?
-    var armAngles: [Int: Float] = [:]
+    var jointAngles: [Int: Float] = [:]
     var didStart = false
     var reps: [WorkoutRepEvent] = []
+}
+
+/// Routes frames to the recognizer chosen before the session starts.
+/// Keeping the cases explicit avoids a speculative shared recognizer protocol.
+nonisolated enum WorkoutRecognitionEngine {
+    case pushUp(PushUpRecognitionEngine)
+    case squat(SquatRecognitionEngine)
+
+    init(exercise: WorkoutExercise) {
+        switch exercise {
+        case .pushUp: self = .pushUp(PushUpRecognitionEngine())
+        case .squat: self = .squat(SquatRecognitionEngine())
+        }
+    }
+
+    mutating func resetTracking() {
+        switch self {
+        case var .pushUp(engine):
+            engine.resetTracking()
+            self = .pushUp(engine)
+        case var .squat(engine):
+            engine.resetTracking()
+            self = .squat(engine)
+        }
+    }
+
+    mutating func consume(_ frame: PoseFrame) -> WorkoutRecognitionUpdate {
+        switch self {
+        case var .pushUp(engine):
+            let update = engine.consume(frame)
+            self = .pushUp(engine)
+            return WorkoutRecognitionUpdate(tracking: update.tracking.workoutState,
+                                            poseReady: update.poseReady,
+                                            jointAngles: update.armAngles,
+                                            didStart: update.didStart,
+                                            reps: update.reps.map {
+                                                WorkoutRepEvent(id: $0.id, timestamp: $0.timestamp)
+                                            })
+        case var .squat(engine):
+            let update = engine.consume(frame)
+            self = .squat(engine)
+            return WorkoutRecognitionUpdate(tracking: update.tracking.workoutState,
+                                            poseReady: update.poseReady,
+                                            jointAngles: update.kneeAngles,
+                                            didStart: update.didStart,
+                                            reps: update.reps.map {
+                                                WorkoutRepEvent(id: $0.id, timestamp: $0.timestamp)
+                                            })
+        }
+    }
 }
 
 nonisolated extension PushUpTrackingState {
@@ -67,6 +119,19 @@ nonisolated extension PushUpTrackingState {
         case .ready: .ready
         case .tracking: .tracking
         case .waitingForArm: .waitingForJoints
+        case .cameraMoving: .cameraMoving
+        }
+    }
+}
+
+nonisolated extension SquatTrackingState {
+    var workoutState: WorkoutTrackingState {
+        switch self {
+        case .findingPosition: .findingPosition
+        case .validatingPosition: .validatingPosition
+        case .ready: .ready
+        case .tracking: .tracking
+        case .waitingForLeg: .waitingForJoints
         case .cameraMoving: .cameraMoving
         }
     }

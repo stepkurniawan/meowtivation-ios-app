@@ -478,6 +478,7 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
     var generation = 0
     var stops = 0
     var poseConfigurationUpdates = 0
+    var configuredJointSets: [[BodyJoint]] = []
     func start(generation: Int, rotation _: Double) {
         self.generation = generation
     }
@@ -487,15 +488,16 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
     }
 
     func updateRotation(_: Double) {}
-    func updatePoseConfiguration(_: WorkoutPoseConfiguration) {
+    func updatePoseConfiguration(_ configuration: WorkoutPoseConfiguration) {
         poseConfigurationUpdates += 1
+        configuredJointSets.append(configuration.trackedJoints)
     }
 }
 
 @MainActor struct PushUpSessionTests {
     @Test func poseReadinessTracksCameraAndArmState() {
         let camera = TestWorkoutCamera(), speech = TestWorkoutSpeech()
-        let model = PushUpSessionModel(speech: speech, cameraFactory: { _ in camera })
+        let model = WorkoutSessionModel(exercise: .pushUp, speech: speech, cameraFactory: { _, _ in camera })
         model.start()
         model.receive(.state(.running), generation: camera.generation)
         #expect(!model.poseReady)
@@ -517,7 +519,7 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
 
     @Test func sessionCountsPushUpsAndRejectsStaleCallbacks() {
         let camera = TestWorkoutCamera(), speech = TestWorkoutSpeech()
-        let model = PushUpSessionModel(speech: speech, cameraFactory: { _ in camera })
+        let model = WorkoutSessionModel(exercise: .pushUp, speech: speech, cameraFactory: { _, _ in camera })
         model.start()
         model.receive(.state(.running), generation: camera.generation)
         for frame in PushUpFixtures.calibrationFrames() {
@@ -526,14 +528,14 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
         for frame in PushUpFixtures.sequence() {
             model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
         }
-        #expect(model.pushUpCount == 3)
+        #expect(model.repCount == 3)
         #expect(camera.poseConfigurationUpdates == 1)
 
         model.receive(.state(.interrupted), generation: camera.generation)
-        let pushUpCount = model.pushUpCount
+        let repCount = model.repCount
         model.receive(.frame(PushUpFixtures.frame(contraction: 0, time: 40), milliseconds: 20),
                       generation: camera.generation)
-        #expect(model.pushUpCount == pushUpCount)
+        #expect(model.repCount == repCount)
 
         model.end()
         #expect(model.hasEnded)
@@ -542,7 +544,7 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
 
     @Test func sessionShowsAndSpeaksTheStartCueOnlyAfterCalibration() {
         let camera = TestWorkoutCamera(), speech = TestWorkoutSpeech()
-        let model = PushUpSessionModel(speech: speech, cameraFactory: { _ in camera })
+        let model = WorkoutSessionModel(exercise: .pushUp, speech: speech, cameraFactory: { _, _ in camera })
         model.start()
         model.receive(.state(.running), generation: camera.generation)
 
@@ -556,7 +558,7 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
 
     @Test func mutedSessionStillShowsTheStartCue() {
         let camera = TestWorkoutCamera(), speech = TestWorkoutSpeech()
-        let model = PushUpSessionModel(speech: speech, cameraFactory: { _ in camera })
+        let model = WorkoutSessionModel(exercise: .pushUp, speech: speech, cameraFactory: { _, _ in camera })
         model.start()
         model.toggleMute()
         model.receive(.state(.running), generation: camera.generation)
@@ -567,5 +569,28 @@ private final nonisolated class TestWorkoutCamera: WorkoutCameraControlling {
 
         #expect(model.startCueVisible)
         #expect(speech.spoken.isEmpty)
+    }
+
+    @Test func selectedSquatSessionUsesSquatRecognitionAndGuidance() {
+        let camera = TestWorkoutCamera(), speech = TestWorkoutSpeech()
+        let model = WorkoutSessionModel(exercise: .squat, speech: speech, cameraFactory: { _, _ in camera })
+        model.start()
+        model.receive(.state(.running), generation: camera.generation)
+
+        for frame in SquatFixtures.calibrationFrames() {
+            model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
+        }
+        for frame in [
+            SquatFixtures.frame(angle: 170, time: 1.1),
+            SquatFixtures.frame(angle: 90, time: 1.3),
+            SquatFixtures.frame(angle: 170, time: 1.5),
+        ] {
+            model.receive(.frame(frame, milliseconds: 20), generation: camera.generation)
+        }
+
+        #expect(model.exercise == .squat)
+        #expect(model.repCount == 1)
+        #expect(camera.configuredJointSets == [Squat.trackedJoints])
+        #expect(speech.spoken == ["Start!", "Squat. 1"])
     }
 }

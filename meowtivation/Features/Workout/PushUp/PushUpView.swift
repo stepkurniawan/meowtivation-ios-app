@@ -10,24 +10,26 @@ struct WorkoutView: View {
 
     private static let developerSequence: [TapSide] = [.left, .right, .left, .right, .left, .right]
 
-    @StateObject private var model = WorkoutSessionModel()
+    @StateObject private var model: WorkoutSessionModel
+    @EnvironmentObject private var store: BlockedAppsStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var developerMode = false
     @State private var developerTapProgress: [TapSide] = []
     @State private var lastDeveloperTap: TimeInterval?
+    @State private var nextExercise: WorkoutExercise?
+    @State private var completionError: String?
 
-    private var activeTitle: String {
-        model.selectedExercise?.title ?? "Push-up"
+    init(exercise: WorkoutExercise) {
+        _model = StateObject(wrappedValue: WorkoutSessionModel(exercise: exercise))
     }
 
-    private var activePlacement: String {
-        model.selectedExercise?.placement ??
-            "Keep one person in view with your arms and legs visible."
+    private var activeTitle: String {
+        model.exercise.title
     }
 
     private var activeConfiguration: WorkoutPoseConfiguration {
-        model.selectedExercise?.poseConfiguration ?? PushUp.poseConfiguration
+        model.exercise.poseConfiguration
     }
 
     /// The main view for the workout session. It displays different content based on the state of the workout session
@@ -35,7 +37,9 @@ struct WorkoutView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if model.hasEnded {
+                if let nextExercise {
+                    exerciseHandoff(nextExercise)
+                } else if model.hasEnded {
                     summary
                 } else if !model.hasStarted {
                     instructions
@@ -99,6 +103,10 @@ struct WorkoutView: View {
                 UIApplication.shared.isIdleTimerDisabled = false
             }
         }
+        .onChange(of: model.repCount) { previous, current in
+            guard current > previous else { return }
+            handleRecognizedRep()
+        }
         .onDisappear {
             developerTapProgress = []
             lastDeveloperTap = nil
@@ -117,22 +125,13 @@ struct WorkoutView: View {
                     "Lean your phone securely against a wall with the screen facing you. Keep one person in view. " +
                         "Rotate the phone if you need a wider view."
                 )
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Push-up or Squat").font(.headline)
-                    Text(
-                        "For a push-up, keep one shoulder, elbow, wrist, and preferably your hip visible from " +
-                            "the side. " +
-                            "For a squat, keep one shoulder, hip, knee, and ankle visible. " +
-                            "Your arms can be bent."
-                    )
-                }
+                Text("\(activeTitle) setup").font(.headline)
+                Text(model.exercise.placement)
                 Text(
-                    "Hold your starting position still until Start! appears, then begin. " +
-                        "The first complete rep selects the exercise and counts as rep 1."
+                    "Hold your starting position still until Start! appears, then begin."
                 )
                 Text(
-                    "Video stays on your phone and is not saved. This session counts reps; " +
-                        "it does not unlock blocked apps."
+                    "Video stays on your phone and is not saved. Completing today’s recipe opens the cat cafe."
                 )
                 .font(.footnote).foregroundStyle(.secondary)
                 Button("Start Counting") { model.start() }
@@ -202,13 +201,13 @@ struct WorkoutView: View {
                 .font(.title2)
                 .foregroundStyle(model.poseReady ? .green : .red)
                 .accessibilityLabel(model.poseReady ? "Pose ready" : "Pose not ready")
-            Text(model.tracking.message).font(.callout).multilineTextAlignment(.center)
+            Text(model.tracking.message(for: model.exercise)).font(.callout).multilineTextAlignment(.center)
             if model.startCueVisible {
                 Text("Start!").font(.title.bold()).foregroundStyle(.green)
                     .accessibilityLabel("Start \(activeTitle)")
             }
             if model.tracking == .findingPosition || model.tracking == .waitingForJoints {
-                Text(activePlacement).font(.caption).foregroundStyle(.secondary)
+                Text(model.exercise.placement).font(.caption).foregroundStyle(.secondary)
             }
             countCard
             if developerMode {
@@ -216,12 +215,12 @@ struct WorkoutView: View {
                             model.processingMilliseconds,
                             model.latestFrame?.joints.values.filter(\.isUsable).count ?? 0))
                     .font(.caption.monospaced())
-                if !model.armAngles.isEmpty {
-                    let armText = model.armAngles.keys.sorted().compactMap { side -> String? in
-                        guard let angle = model.armAngles[side] else { return nil }
+                if !model.jointAngles.isEmpty {
+                    let angleText = model.jointAngles.keys.sorted().compactMap { side -> String? in
+                        guard let angle = model.jointAngles[side] else { return nil }
                         return "\(side == 0 ? "Right" : "Left"): \(Int(angle))°"
                     }.joined(separator: " · ")
-                    Text(armText)
+                    Text(angleText)
                         .font(.caption.monospaced())
                 }
                 Text("Green: corroborated joint. Orange: rejected. A returned joint does not prove visibility.")
@@ -264,11 +263,70 @@ struct WorkoutView: View {
     private var summary: some View {
         VStack(spacing: 24) {
             Image(systemName: "figure.strengthtraining.traditional").font(.system(size: 60))
-            Text("Session complete").font(.title.bold())
+            Text(store.hasCompletedDailyWorkout ? "Daily recipe complete" : "Session complete").font(.title.bold())
             countCard
-            Text("Your next session starts at zero.").foregroundStyle(.secondary)
+            dailyProgress
+            if let completionError {
+                Text(completionError).foregroundStyle(.red).multilineTextAlignment(.center)
+                Button("Try Again") { retryCompletion() }.buttonStyle(.borderedProminent)
+            }
             Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
         }.padding()
+    }
+
+    private func exerciseHandoff(_ exercise: WorkoutExercise) -> some View {
+        VStack(spacing: 24) {
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 60)).foregroundStyle(.green)
+            Text("\(model.exercise.title) complete").font(.title.bold())
+            dailyProgress
+            Text("Next: \(exercise.title)").font(.title2.bold())
+            Text("Set up for the next exercise, then continue counting.")
+                .foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button("Continue to \(exercise.title)") {
+                nextExercise = nil
+                model.prepareForNextExercise(exercise)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+    }
+
+    private var dailyProgress: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(store.dailyRecipe.entries) { entry in
+                if entry.isEnabled {
+                    Text("\(entry.exercise.title): \(store.completedRepetitions(for: entry.exercise))/\(entry.target)")
+                        .monospacedDigit()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func handleRecognizedRep() {
+        do {
+            try store.recordRecognizedRep(for: model.exercise)
+            if store.hasCompletedDailyWorkout {
+                model.end()
+            } else if let exercise = store.nextRecipeExercise, exercise != model.exercise {
+                model.end()
+                nextExercise = exercise
+            }
+        } catch {
+            completionError = error.localizedDescription
+            model.end()
+        }
+    }
+
+    private func retryCompletion() {
+        do {
+            try store.retryDailyRecipeCompletion()
+            completionError = nil
+        } catch {
+            completionError = error.localizedDescription
+        }
     }
 }
 

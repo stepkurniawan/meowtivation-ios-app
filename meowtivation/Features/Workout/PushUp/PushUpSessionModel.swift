@@ -5,13 +5,13 @@ import Foundation
 // This model remains ObservableObject because the view uses StateObject ownership.
 // swiftlint:disable:next observable_object_legacy
 final class WorkoutSessionModel: ObservableObject {
+    @Published private(set) var exercise: WorkoutExercise
     @Published private(set) var repCount = 0
     @Published private(set) var poseReady = false
     @Published private(set) var tracking = WorkoutTrackingState.findingPosition
-    @Published private(set) var selectedExercise: WorkoutExercise?
     @Published private(set) var cameraState = WorkoutCameraState.idle
     @Published private(set) var latestFrame: PoseFrame?
-    @Published private(set) var armAngles: [Int: Float] = [:]
+    @Published private(set) var jointAngles: [Int: Float] = [:]
     @Published private(set) var processingMilliseconds = 0.0
     @Published private(set) var analysisFPS = 0.0
     @Published private(set) var hasStarted = false
@@ -19,7 +19,7 @@ final class WorkoutSessionModel: ObservableObject {
     @Published private(set) var isMuted = false
     @Published private(set) var startCueVisible = false
 
-    private var engine = PushUpRecognitionEngine()
+    private var engine: WorkoutRecognitionEngine
     private var lastCreditedID: UInt64 = 0
     private var lastPromptAt = -Double.infinity
     private var lastFrameAt: Double?
@@ -33,20 +33,20 @@ final class WorkoutSessionModel: ObservableObject {
         cameraStorage
     }
 
-    /// Compatibility for existing callers while the UI moves to the shared name.
-    var pushUpCount: Int {
-        repCount
-    }
-
-    init(speech: (any WorkoutSpeaking)? = nil,
-         cameraFactory: (@escaping @Sendable (Int, WorkoutCameraEvent) -> Void) -> any WorkoutCameraControlling = {
-             WorkoutCamera(configuration: PushUp.poseConfiguration, onEvent: $0)
+    init(exercise: WorkoutExercise,
+         speech: (any WorkoutSpeaking)? = nil,
+         cameraFactory: (WorkoutPoseConfiguration,
+                         @escaping @Sendable (Int, WorkoutCameraEvent) -> Void) -> any WorkoutCameraControlling = {
+             WorkoutCamera(configuration: $0, onEvent: $1)
          })
     {
+        self.exercise = exercise
+        engine = WorkoutRecognitionEngine(exercise: exercise)
         self.speech = speech ?? WorkoutSpeech()
-        cameraStorage = cameraFactory { [weak self] token, event in
+        cameraStorage = cameraFactory(exercise.poseConfiguration) { [weak self] token, event in
             Task { @MainActor [weak self] in self?.receive(event, generation: token) }
         }
+        cameraStorage.updatePoseConfiguration(exercise.poseConfiguration)
     }
 
     func start() {
@@ -88,6 +88,19 @@ final class WorkoutSessionModel: ObservableObject {
         hasEnded = true
     }
 
+    /// Stops the current exercise and prepares the same camera session for the next recipe item.
+    func prepareForNextExercise(_ exercise: WorkoutExercise) {
+        pause()
+        self.exercise = exercise
+        engine = WorkoutRecognitionEngine(exercise: exercise)
+        camera.updatePoseConfiguration(exercise.poseConfiguration)
+        repCount = 0
+        lastCreditedID = 0
+        hasStarted = false
+        hasEnded = false
+        resetPublishedTracking()
+    }
+
     func toggleMute() {
         isMuted.toggle()
         if isMuted {
@@ -108,8 +121,7 @@ final class WorkoutSessionModel: ObservableObject {
     private func resetPublishedTracking() {
         poseReady = false
         tracking = .findingPosition
-        selectedExercise = .pushUp
-        armAngles = [:]
+        jointAngles = [:]
         startCueVisible = false
         startCueUntil = -Double.infinity
     }
@@ -142,9 +154,8 @@ final class WorkoutSessionModel: ObservableObject {
 
             let update = engine.consume(frame)
             poseReady = update.poseReady
-            tracking = update.tracking.workoutState
-            selectedExercise = .pushUp
-            armAngles = update.armAngles
+            tracking = update.tracking
+            jointAngles = update.jointAngles
             startCueVisible = frame.timestamp < startCueUntil
             if update.didStart {
                 startCueUntil = frame.timestamp + 1.5
@@ -163,18 +174,14 @@ final class WorkoutSessionModel: ObservableObject {
                 speech.say("Start!")
                 lastPromptAt = frame.timestamp
             } else if counted {
-                speech.say(repCount == 1 ? "Push Up. \(repCount)" : "\(repCount)")
+                speech.say(repCount == 1 ? "\(exercise.title). \(repCount)" : "\(repCount)")
                 lastPromptAt = frame.timestamp
-            } else if update.tracking == .waitingForArm || update.tracking == .cameraMoving,
+            } else if update.tracking == .waitingForJoints || update.tracking == .cameraMoving,
                       frame.timestamp - lastPromptAt >= 8
             {
-                speech.say(update.tracking.message)
+                speech.say(update.tracking.message(for: exercise))
                 lastPromptAt = frame.timestamp
             }
         }
     }
 }
-
-/// Preserve the old type name for existing tests and integrations during the
-/// transition to the shared workout model.
-typealias PushUpSessionModel = WorkoutSessionModel

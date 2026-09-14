@@ -16,7 +16,7 @@ struct MeowtivationApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            LandingView()
                 .environmentObject(blockedAppsStore)
                 .onChange(of: scenePhase) { _, phase in
                     if phase ==

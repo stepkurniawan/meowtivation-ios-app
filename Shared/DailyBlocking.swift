@@ -91,6 +91,14 @@ nonisolated enum DailyBlocking {
         return !calendar.isDate(completedAt, inSameDayAs: now)
     }
 
+    /// A real workout completion is separate from a developer unlock override.
+    static func hasCompletedDailyWorkout(in defaults: UserDefaults, now: Date,
+                                         calendar: Calendar = .autoupdatingCurrent) -> Bool
+    {
+        guard let completedAt: Date = defaults.object(forKey: workoutCompletionKey) as? Date else { return false }
+        return calendar.isDate(completedAt, inSameDayAs: now)
+    }
+
     /// Applies app blocking restrictions to the managed settings store.
     ///
     /// Configures the shield in the managed settings store to block selected apps, categories, and web domains.
