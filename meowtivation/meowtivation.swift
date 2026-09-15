@@ -18,11 +18,12 @@ struct MeowtivationApp: App {
         WindowGroup {
             LandingView()
                 .environmentObject(blockedAppsStore)
-                .onChange(of: scenePhase) { _, phase in
-                    if phase ==
-                        .active
-                    { // when the app becomes active, refresh the lock state to ensure it's up to date
-                        blockedAppsStore.refreshLockState()
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    guard phase == .active else { return }
+                    Task { @MainActor in
+                        // Let the first frame use the state loaded from shared defaults.
+                        await Task.yield()
+                        blockedAppsStore.reconcile()
                     }
                 }
                 .onReceive(NotificationCenter.default

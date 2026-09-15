@@ -11,6 +11,7 @@ final class BlockedAppsStore: ObservableObject {
     private static let dailyWorkoutRecipeKey = "dailyWorkoutRecipe"
     private static let pendingDailyWorkoutRecipeKey = "pendingDailyWorkoutRecipe"
     private static let dailyProgressKey = "dailyWorkoutProgress"
+    private static let legacyManagedSettingsMigrationKey = "didMigrateLegacyManagedSettings"
 
     @Published private(set) var isLocked = true
     @Published private(set) var hasDeveloperOverride = false
@@ -34,10 +35,11 @@ final class BlockedAppsStore: ObservableObject {
     }
 
     private let defaults: UserDefaults
-    private let managedSettings = ManagedSettingsStore(named: DailyBlocking.storeName)
+    private lazy var managedSettings = ManagedSettingsStore(named: DailyBlocking.storeName)
     private let now: () -> Date
     private let calendar: Calendar
     private let startMonitoring: () throws -> Void
+    private var needsLegacyShieldCleanup: Bool
 
     private let authorizationCheck: () -> Bool
 
@@ -65,18 +67,16 @@ final class BlockedAppsStore: ObservableObject {
         self.calendar = calendar
         self.startMonitoring = startMonitoring
         self.authorizationCheck = authorizationCheck
+        needsLegacyShieldCleanup = defaults == nil
 
+        let date = now()
         selection = DailyBlocking.selection(from: sharedDefaults)
         dailyWorkoutRecipe = Self.recipe(from: sharedDefaults)
         pendingDailyWorkoutRecipe = Self.pendingRecipe(from: sharedDefaults)
-        dailyProgress = Self.progress(from: sharedDefaults, now: now(), calendar: calendar)
+        dailyProgress = Self.progress(from: sharedDefaults, now: date, calendar: calendar)
         userName = sharedDefaults.string(forKey: AppSettings.userNameKey) ?? ""
 
-        refreshLockState()
-        if defaults == nil {
-            // Older builds used the app's unnamed store. Remove those shields.
-            DailyBlocking.apply(selection: selection, isLocked: false, to: ManagedSettingsStore())
-        }
+        loadPersistedState(at: date)
     }
 
     /// Call only after the daily workout has been successfully completed.
@@ -235,6 +235,14 @@ final class BlockedAppsStore: ObservableObject {
         saveProgress()
     }
 
+    private func loadPersistedState(at date: Date) {
+        refreshRecipeIfNeeded(at: date)
+        refreshProgressIfNeeded(at: date)
+        hasDeveloperOverride = DailyBlocking.developerOverride(in: defaults, now: date, calendar: calendar) != nil
+        isLocked = DailyBlocking.isLocked(in: defaults, now: date, calendar: calendar)
+        isCafeOpen = DailyBlocking.hasCompletedDailyWorkout(in: defaults, now: date, calendar: calendar) && !isLocked
+    }
+
     private func saveRecipe() {
         guard let data = try? JSONEncoder().encode(dailyWorkoutRecipe) else { return }
         defaults.set(data, forKey: Self.dailyWorkoutRecipeKey)
@@ -296,8 +304,13 @@ extension BlockedAppsStore {
     }
 
     func refreshLockState() {
+        reconcile()
+    }
+
+    /// Reconciles persisted state with Screen Time monitoring and managed shields.
+    func reconcile() {
         let startedAt = ContinuousClock.now
-        WorkoutDebugLog.lifecycle.info("BlockedAppsStore refreshLockState started")
+        WorkoutDebugLog.lifecycle.info("BlockedAppsStore reconcile started")
         if isAuthorized {
             do {
                 try ensureDailyReset()
@@ -306,23 +319,25 @@ extension BlockedAppsStore {
             }
         }
         let date = now()
-        refreshRecipeIfNeeded(at: date)
-        refreshProgressIfNeeded(at: date)
-        hasDeveloperOverride = DailyBlocking.developerOverride(in: defaults, now: date, calendar: calendar) != nil
-        isLocked = DailyBlocking.isLocked(in: defaults, now: date, calendar: calendar)
-        isCafeOpen = DailyBlocking.hasCompletedDailyWorkout(in: defaults, now: date, calendar: calendar) && !isLocked
+        loadPersistedState(at: date)
+        if needsLegacyShieldCleanup, !defaults.bool(forKey: Self.legacyManagedSettingsMigrationKey) {
+            // Older builds used the app's unnamed store. Remove those shields once.
+            DailyBlocking.apply(selection: selection, isLocked: false, to: ManagedSettingsStore())
+            defaults.set(true, forKey: Self.legacyManagedSettingsMigrationKey)
+        }
+        needsLegacyShieldCleanup = false
         DailyBlocking.apply(selection: selection, isLocked: isLocked, to: managedSettings)
         let durationMilliseconds = WorkoutDebugLog.elapsedMilliseconds(since: startedAt)
         let lockState = isLocked
         let cafeOpen = isCafeOpen
         WorkoutDebugLog.lifecycle.info(
-            "BlockedAppsStore refreshLockState finished; durationMs=\(durationMilliseconds, privacy: .public)"
+            "BlockedAppsStore reconcile finished; durationMs=\(durationMilliseconds, privacy: .public)"
         )
         WorkoutDebugLog.lifecycle.info(
-            "BlockedAppsStore refreshLockState state; locked=\(lockState, privacy: .public)"
+            "BlockedAppsStore reconcile state; locked=\(lockState, privacy: .public)"
         )
         WorkoutDebugLog.lifecycle.info(
-            "BlockedAppsStore refreshLockState finished; cafeOpen=\(cafeOpen, privacy: .public)"
+            "BlockedAppsStore reconcile finished; cafeOpen=\(cafeOpen, privacy: .public)"
         )
     }
 }

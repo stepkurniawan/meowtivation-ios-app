@@ -228,11 +228,11 @@ The Workout feature keeps reusable camera and pose infrastructure at its root.
 Exercise-specific code lives in its own folder, and the selected exercise remains
 fixed for each session.
 
-- [`PushUpView.swift`](meowtivation/Features/Workout/PushUp/PushUpView.swift)
+- [`WorkoutView.swift`](meowtivation/Features/Workout/WorkoutView.swift)
   contains the shared `WorkoutView`, which displays setup guidance, the live camera
   preview, the selected exercise, the count, tracking status, diagnostics,
   and the completed session summary. It pauses and resumes with scene phase.
-- [`PushUpSessionModel.swift`](meowtivation/Features/Workout/PushUp/PushUpSessionModel.swift)
+- [`WorkoutSessionModel.swift`](meowtivation/Features/Workout/WorkoutSessionModel.swift)
   contains the shared `WorkoutSessionModel`, which coordinates the fixed exercise,
   session lifecycle, count, camera state, orientation, speech feedback, and published
   view state.

@@ -25,6 +25,30 @@ struct MeowtivationTests {
 
 extension MeowtivationTests {
     @MainActor
+    @Test func storeLoadsSavedStateBeforeReconciliation() throws {
+        let suiteName = "DailyLockTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let date = Date(timeIntervalSince1970: 1_000_000)
+        defaults.set(date, forKey: DailyBlocking.workoutCompletionKey)
+        var monitoringCalls = 0
+
+        let store = BlockedAppsStore(
+            defaults: defaults,
+            now: { date },
+            startMonitoring: { monitoringCalls += 1 },
+            authorizationCheck: { true }
+        )
+
+        #expect(monitoringCalls == 0)
+        #expect(!store.isLocked)
+        #expect(store.isCafeOpen)
+
+        store.reconcile()
+        #expect(monitoringCalls == 1)
+    }
+
+    @MainActor
     @Test func userNamePersistsInTheSharedDefaultsStore() throws {
         let suiteName = "DailyLockTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))

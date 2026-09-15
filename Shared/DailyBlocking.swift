@@ -108,11 +108,22 @@ nonisolated enum DailyBlocking {
     ///   - isLocked: Whether blocking should be active; if `false`, removes all restrictions.
     ///   - store: The `ManagedSettingsStore` to apply restrictions to.
     static func apply(selection: FamilyActivitySelection, isLocked: Bool, to store: ManagedSettingsStore) {
-        store.shield.applications = isLocked && !selection.applicationTokens.isEmpty
+        let applications = isLocked && !selection.applicationTokens.isEmpty
             ? selection.applicationTokens : nil
-        store.shield.applicationCategories = isLocked && !selection.categoryTokens.isEmpty
-            ? .specific(selection.categoryTokens) : nil
-        store.shield.webDomains = isLocked && !selection.webDomainTokens.isEmpty
+        let applicationCategories: ShieldSettings.ActivityCategoryPolicy<Application>? =
+            isLocked && !selection.categoryTokens.isEmpty
+                ? .specific(selection.categoryTokens) : nil
+        let webDomains = isLocked && !selection.webDomainTokens.isEmpty
             ? selection.webDomainTokens : nil
+
+        if store.shield.applications != applications {
+            store.shield.applications = applications
+        }
+        if store.shield.applicationCategories != applicationCategories {
+            store.shield.applicationCategories = applicationCategories
+        }
+        if store.shield.webDomains != webDomains {
+            store.shield.webDomains = webDomains
+        }
     }
 }

@@ -41,6 +41,7 @@ struct LandingView: View {
     @State private var isLandingVisible = false
     @State private var selectedExercise: WorkoutExercise?
     @State private var selectedWorkoutMode: WorkoutSessionMode = .daily
+    @State private var showsSettings = false
     @State private var showsExerciseChooser = false
     @State private var showsOpenCafe = false
 
@@ -57,7 +58,11 @@ struct LandingView: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .overlay(alignment: .bottom) {
-                    developerTapTargets
+                    if isLandingVisible, scenePhase == .active, selectedExercise == nil, !showsSettings,
+                       !showsExerciseChooser, commandError == nil
+                    {
+                        developerTapTargets
+                    }
                 }
             }
             .onAppear {
@@ -70,6 +75,7 @@ struct LandingView: View {
             }
             .onChange(of: scenePhase) { _, _ in resetTapProgress() }
             .onChange(of: selectedExercise) { _, _ in resetTapProgress() }
+            .onChange(of: showsSettings) { _, _ in resetTapProgress() }
             .onChange(of: store.isCafeOpen) { _, opens in
                 guard selectedExercise == nil else { return }
                 setCafeOpen(opens, animated: opens)
@@ -129,6 +135,9 @@ struct LandingView: View {
             } message: {
                 Text("Choose an exercise for an extra workout.")
             }
+            .navigationDestination(isPresented: $showsSettings) {
+                DailyWorkoutSettingsView()
+            }
         }
     }
 
@@ -185,8 +194,8 @@ struct LandingView: View {
 
     private var settingsLink: some View {
         HStack {
-            NavigationLink {
-                DailyWorkoutSettingsView()
+            Button {
+                showsSettings = true
             } label: {
                 Image(systemName: "gearshape.fill")
                     .font(.title3.weight(.semibold))
@@ -272,8 +281,8 @@ private extension LandingView {
                 Text("Choose apps in Settings to block them until today’s workout is complete.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                NavigationLink {
-                    DailyWorkoutSettingsView()
+                Button {
+                    showsSettings = true
                 } label: {
                     Label("Choose Blocked Apps", systemImage: "gearshape")
                         .frame(maxWidth: .infinity)

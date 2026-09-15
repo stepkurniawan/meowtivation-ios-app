@@ -73,7 +73,7 @@ struct WorkoutView: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if !developerMode {
+                if !developerMode, scenePhase == .active, !model.hasEnded, nextExercise == nil {
                     HStack(spacing: 0) {
                         Color.clear
                             .frame(width: 96, height: 96)
@@ -387,6 +387,3 @@ struct WorkoutView: View {
         }
     }
 }
-
-/// Compatibility for callers that still present the old push-up view name.
-typealias PushUpView = WorkoutView
