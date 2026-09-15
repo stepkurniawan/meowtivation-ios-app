@@ -27,16 +27,16 @@ final class MeowtivationUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["No apps selected"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.staticTexts["Next: Push-up"].exists)
-        XCTAssertTrue(app.staticTexts["0 of 5 reps today"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["blocking-status"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["next-exercise"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["daily-progress"].waitForExistence(timeout: 2))
 
-        let startWorkout = app.buttons["Start Workout"]
+        let startWorkout = app.buttons["start-workout"]
         XCTAssertTrue(startWorkout.waitForExistence(timeout: 2))
         startWorkout.tap()
-        XCTAssertTrue(app.staticTexts["Push-up setup"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["workout-setup"].waitForExistence(timeout: 2))
 
-        app.buttons["Done"].tap()
+        app.buttons["workout-done"].tap()
         XCTAssertTrue(startWorkout.waitForExistence(timeout: 2))
     }
 

@@ -276,6 +276,7 @@ private extension LandingView {
             Label(blockingStatus.title, systemImage: blockingStatus.symbol)
                 .font(.headline)
                 .foregroundStyle(blockingStatus.tint)
+                .accessibilityIdentifier("blocking-status")
 
             if !hasBlockedApps {
                 Text("Choose apps in Settings to block them until today’s workout is complete.")
@@ -293,10 +294,12 @@ private extension LandingView {
             if let nextTarget {
                 Text("Next: \(nextTarget.exercise.title)")
                     .font(.title3.bold())
+                    .accessibilityIdentifier("next-exercise")
                 Text("\(store.completedRepetitions(for: nextTarget.exercise)) of \(nextTarget.target) reps today")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                    .accessibilityIdentifier("daily-progress")
                 Button {
                     startWorkout()
                 } label: {
@@ -306,6 +309,7 @@ private extension LandingView {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .accessibilityIdentifier("start-workout")
             } else if needsUnlockRetry {
                 Text("Workout complete")
                     .font(.title3.bold())

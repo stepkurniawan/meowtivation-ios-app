@@ -62,6 +62,7 @@ struct WorkoutView: View {
                             dismiss()
                         }
                     }
+                    .accessibilityIdentifier("workout-done")
                 }
                 if model.hasStarted && !model.hasEnded {
                     ToolbarItem(placement: .primaryAction) {
@@ -136,7 +137,9 @@ struct WorkoutView: View {
                     "Lean your phone securely against a wall with the screen facing you. Keep one person in view. " +
                         "Rotate the phone if you need a wider view."
                 )
-                Text("\(activeTitle) setup").font(.headline)
+                Text("\(activeTitle) setup")
+                    .font(.headline)
+                    .accessibilityIdentifier("workout-setup")
                 Text(model.exercise.placement)
                 Text(
                     "Hold your starting position still until Start! appears, then begin."
