@@ -19,6 +19,7 @@ struct WorkoutView: View {
     @State private var developerMode = false
     @State private var developerTapProgress: [TapSide] = []
     @State private var lastDeveloperTap: TimeInterval?
+    @State private var isGlowAtPeak = false
     @State private var nextExercise: WorkoutExercise?
     @State private var completionError: String?
     @ScaledMetric(relativeTo: .largeTitle) private var dailyCountSize = 52
@@ -62,7 +63,7 @@ struct WorkoutView: View {
                             dismiss()
                         }
                     }
-                    .accessibilityIdentifier("workout-done")
+                    .accessibilityIdentifier(model.hasStarted && !model.hasEnded ? "end-workout" : "workout-done")
                 }
                 if model.hasStarted && !model.hasEnded {
                     ToolbarItem(placement: .primaryAction) {
@@ -204,10 +205,24 @@ struct WorkoutView: View {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(poseGlow, lineWidth: 4)
-                    .shadow(color: poseGlow.opacity(0.8), radius: 12)
+                    .stroke(poseGlow.opacity(glowStrokeOpacity), lineWidth: 3)
+                    .shadow(color: poseGlow.opacity(glowShadowOpacity), radius: glowShadowRadius)
+                    .animation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true), value: isGlowAtPeak)
             }
+            .onAppear { isGlowAtPeak = true }
             .accessibilityLabel("Live front camera preview")
+    }
+
+    private var glowStrokeOpacity: Double {
+        isGlowAtPeak ? 0.9 : 0.35
+    }
+
+    private var glowShadowOpacity: Double {
+        isGlowAtPeak ? 0.75 : 0.15
+    }
+
+    private var glowShadowRadius: CGFloat {
+        isGlowAtPeak ? 20 : 6
     }
 
     private var poseGlow: Color {
